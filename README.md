@@ -25,7 +25,7 @@ Music starts at 20% player volume and remembers volume changes. It does not chan
 
 ## Install
 
-Requires **Omarchy 4's Quickshell bar**, Python 3.8+, **mpv 0.38+**, and a recent yt-dlp. Tested on Omarchy 4.0.4 with mpv 0.41. `notify-send` is optional and provides error notifications.
+Requires **Omarchy 4's Quickshell bar** with the `qs.Commons` and `qs.Ui` components (`PopupCard`, `Dropdown`, and the bar buttons), Python 3.8+, **mpv 0.38+**, and a recent yt-dlp. Tested on Omarchy 4.0.4 with mpv 0.41. Other Omarchy versions must provide the same shell UI API. A plain Hyprland installation or a Waybar-based Omarchy bar can use the command-line player; the QML widget requires the Omarchy shell. `notify-send` is optional and provides error notifications.
 
 Install any missing dependencies:
 
@@ -106,7 +106,7 @@ Saved volume and queue state remain in your user state directory.
 
 ## Development
 
-The controller uses only Python's standard library. Offline tests check catalog durations and duplicate entries, shuffle consumption, segment boundaries, portable paths, track credits, and mpv's JSON IPC framing.
+The controller uses only Python's standard library. Offline tests check catalog durations and duplicate entries, shuffle consumption, segment boundaries, portable paths, clean installs with spaces and Unicode, unset/empty/custom XDG directories, track credits, and mpv's JSON IPC framing.
 
 ```bash
 python -m unittest discover -s tests -v

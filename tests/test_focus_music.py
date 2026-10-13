@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import socket
+import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -53,6 +55,46 @@ class CatalogTests(unittest.TestCase):
             text = (ROOT / relative).read_text()
             self.assertNotRegex(text, r'/home/[^/]+/')
             self.assertNotIn('/usr/bin/yt-dlp', text)
+
+
+class DeploymentTests(unittest.TestCase):
+    def test_clean_install_from_a_path_with_spaces_and_unicode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            install = root / 'Plugin install ü'
+            (install / 'bin').mkdir(parents=True)
+            (install / 'data').mkdir()
+            (install / 'bin/focus-music').write_bytes((ROOT / 'bin/focus-music').read_bytes())
+            (install / 'data/sources.json').write_bytes((ROOT / 'data/sources.json').read_bytes())
+            home = root / 'New user home ü'
+            home.mkdir()
+            environment = dict(os.environ)
+            for key in ('FOCUS_MUSIC_CONFIG', 'FOCUS_MUSIC_RUNTIME', 'FOCUS_MUSIC_STATE',
+                        'XDG_CONFIG_HOME', 'XDG_STATE_HOME'):
+                environment.pop(key, None)
+            environment.update(HOME=str(home), XDG_RUNTIME_DIR=str(root / 'runtime'),
+                               PYTHONDONTWRITEBYTECODE='1')
+            for mode in ('unset', 'empty', 'custom'):
+                with self.subTest(mode=mode):
+                    env = dict(environment)
+                    if mode == 'empty':
+                        env.update(XDG_CONFIG_HOME='', XDG_STATE_HOME='',
+                                   FOCUS_MUSIC_CONFIG='', FOCUS_MUSIC_STATE='', FOCUS_MUSIC_RUNTIME='')
+                    elif mode == 'custom':
+                        env.update(XDG_CONFIG_HOME=str(root / 'config ü'),
+                                   XDG_STATE_HOME=str(root / 'state ü'))
+                    command = [sys.executable, str(install / 'bin/focus-music')]
+                    result = subprocess.run(command + ['genres'], env=env, cwd=install,
+                                            capture_output=True, text=True, check=True)
+                    self.assertEqual(len(json.loads(result.stdout)), 5)
+                    result = subprocess.run(command + ['status'], env=env, cwd=install,
+                                            capture_output=True, text=True, check=True)
+                    self.assertEqual(json.loads(result.stdout)['phase'], 'Stopped')
+                    subprocess.run(command + ['volume', '5'], env=env, cwd=install,
+                                   capture_output=True, text=True, check=True)
+                    state_root = Path(env.get('XDG_STATE_HOME') or home / '.local/state')
+                    self.assertTrue((state_root / 'focus-music/state.json').exists())
+                    self.assertFalse((install / 'focus-music/state.json').exists())
 
 
 class PlayerTests(unittest.TestCase):

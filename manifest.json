@@ -2,17 +2,23 @@
   "schemaVersion": 1,
   "id": "maxrio9.focus-music",
   "name": "Focus Music",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Maxrio9",
   "license": "MIT",
   "description": "Instrumental focus music with shuffled playlists, a scrolling track banner, genre selector and mouse controls.",
-  "kinds": ["bar-widget"],
-  "entryPoints": {"barWidget": "BarWidget.qml"},
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
   "barWidget": {
     "displayName": "Focus Music",
     "category": "Media",
     "allowMultiple": false,
     "defaultSection": "center",
-    "defaults": {"bannerWidth": 180}
+    "defaults": {
+      "bannerWidth": 180
+    }
   }
 }
