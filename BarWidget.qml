@@ -49,9 +49,22 @@ BarWidget {
             Qt.callLater(root.flushPlayback)
         }
     }
+    property string catalogRevision: ""
+    property bool genresPending: false
     property real displayedVolume: 20
     property bool volumePending: false
+    function refreshGenres() {
+        if (!genrePoll.running && genresPending) {
+            genresPending = false
+            genrePoll.running = true
+        }
+    }
     onPlayerChanged: {
+        if (player.catalog_revision && player.catalog_revision !== catalogRevision) {
+            catalogRevision = player.catalog_revision
+            genresPending = true
+            refreshGenres()
+        }
         if (!volumeChange.running && !volumePending && player.volume !== undefined)
             displayedVolume = player.volume
     }
@@ -90,6 +103,7 @@ BarWidget {
     }
     Process {
         id: genrePoll
+        onExited: Qt.callLater(root.refreshGenres)
         command: ["python3", root.controllerPath, "genres"]
         running: true
         stdout: StdioCollector {

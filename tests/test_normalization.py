@@ -19,6 +19,7 @@ def load_normalizer(directory):
     with patch.dict(os.environ, {'FOCUS_MUSIC_RUNTIME': str(directory / 'runtime'),
                                 'FOCUS_MUSIC_STATE': str(directory / 'state.json'),
                                 'FOCUS_MUSIC_CONFIG': str(ROOT / 'data/sources.json'),
+                                'FOCUS_MUSIC_LOCAL_CONFIG': str(directory / 'local-sources.json'),
                                 'FOCUS_MUSIC_CACHE': str(directory / 'cache')}):
         loader = importlib.machinery.SourceFileLoader('focus_normalizer_test', str(ROOT / 'bin/normalize-track'))
         module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))

@@ -66,7 +66,10 @@ def measure_source(url, start, duration, cancel=None):
 
 
 def cache_path(track):
-    signature = hashlib.sha256(json.dumps([track['url'], track['start'], track['end']], separators=(',', ':')).encode()).hexdigest()
+    identity = [track['url'], track['start'], track['end']]
+    if track.get('fingerprint'):
+        identity.append(track['fingerprint'])
+    signature = hashlib.sha256(json.dumps(identity, separators=(',', ':')).encode()).hexdigest()
     return CACHE / (signature + '.json')
 
 
@@ -85,11 +88,16 @@ def measurement(track, cancel=None):
     result = cached_measurement(track)
     if result is not None:
         return result
-    resolver = subprocess.run(['yt-dlp', '--no-warnings', '--no-playlist', '-f', 'bestaudio', '-g', track['url']],
-                              capture_output=True, text=True, timeout=90)
-    if resolver.returncode or not resolver.stdout.strip():
-        raise RuntimeError('Could not resolve audio for loudness analysis')
-    result = measure_source(resolver.stdout.strip().splitlines()[0], track['start'], track['duration'], cancel=cancel)
+    local = player.local_path(track)
+    if local is not None:
+        audio = str(local)
+    else:
+        resolver = subprocess.run(['yt-dlp', '--no-warnings', '--no-playlist', '-f', 'bestaudio', '-g', track['url']],
+                                  capture_output=True, text=True, timeout=90)
+        if resolver.returncode or not resolver.stdout.strip():
+            raise RuntimeError('Could not resolve audio for loudness analysis')
+        audio = resolver.stdout.strip().splitlines()[0]
+    result = measure_source(audio, track['start'], track['duration'], cancel=cancel)
     result.update(schema=1, measured_at=int(time.time()))
     CACHE.mkdir(parents=True, exist_ok=True)
     temporary = cache_file.with_suffix('.' + str(os.getpid()) + '.tmp')
@@ -120,7 +128,7 @@ def superseded(index, generation, prefetch=False):
 def main():
     if os.environ.get('FOCUS_MUSIC_NORMALIZE', '1') == '0':
         return {'state': 'off', 'gain_db': 0}
-    if not all(shutil.which(dependency) for dependency in ('ffmpeg', 'yt-dlp')):
+    if not shutil.which('ffmpeg'):
         return {'state': 'unavailable', 'gain_db': 0}
     os.nice(10)
     mode = sys.argv[1] if len(sys.argv) > 1 else 'current'

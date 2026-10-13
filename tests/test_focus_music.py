@@ -20,6 +20,7 @@ def load_player(directory, config=None):
         'FOCUS_MUSIC_RUNTIME': str(directory / 'runtime'),
         'FOCUS_MUSIC_STATE': str(directory / 'state.json'),
         'FOCUS_MUSIC_CONFIG': str(config or ROOT / 'data/sources.json'),
+        'FOCUS_MUSIC_LOCAL_CONFIG': str(directory / 'local-sources.json'),
     }
     with patch.dict(os.environ, environment):
         loader = importlib.machinery.SourceFileLoader('focus_music_test', str(ROOT / 'bin/focus-music'))
@@ -64,13 +65,15 @@ class DeploymentTests(unittest.TestCase):
             install = root / 'Plugin install ü'
             (install / 'bin').mkdir(parents=True)
             (install / 'data').mkdir()
+            (install / 'lib').mkdir()
+            (install / 'lib/focus_library.py').write_bytes((ROOT / 'lib/focus_library.py').read_bytes())
             (install / 'bin/focus-music').write_bytes((ROOT / 'bin/focus-music').read_bytes())
             (install / 'data/sources.json').write_bytes((ROOT / 'data/sources.json').read_bytes())
             home = root / 'New user home ü'
             home.mkdir()
             environment = dict(os.environ)
             for key in ('FOCUS_MUSIC_CONFIG', 'FOCUS_MUSIC_RUNTIME', 'FOCUS_MUSIC_STATE',
-                        'XDG_CONFIG_HOME', 'XDG_STATE_HOME'):
+                        'XDG_CONFIG_HOME', 'XDG_STATE_HOME', 'FOCUS_MUSIC_LOCAL_CONFIG'):
                 environment.pop(key, None)
             environment.update(HOME=str(home), XDG_RUNTIME_DIR=str(root / 'runtime'),
                                PYTHONDONTWRITEBYTECODE='1')
@@ -119,7 +122,7 @@ class PlayerTests(unittest.TestCase):
         self.props = {'idle-active': True, 'volume': 20, 'playlist-pos': 0, 'pause': False,
                       'path': '', 'time-pos': 0}
         self.commands = []
-        self.player.ensure_player = lambda saved: None
+        self.player.ensure_player = lambda saved, source: None
         self.player.ipc = self.fake_ipc
         self.player.prop = lambda name: self.props[name]
         self.player.ipc_many = lambda commands: (self.fake_ipc(c) for c in commands)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Shuffled instrumental playlists for the Omarchy bar."""
 import fcntl
+import hashlib
 import json
 import os
 import random
@@ -12,14 +13,24 @@ import sys
 import time
 
 PACKAGE = Path(__file__).resolve().parent.parent
-USER_CONFIG = Path(os.environ.get('XDG_CONFIG_HOME') or str(Path.home() / '.config')) / 'focus-music/sources.json'
+sys.path.insert(0, str(PACKAGE / 'lib'))
+from focus_library import index_library, local_path
+
+CONFIG_HOME = Path(os.environ.get('XDG_CONFIG_HOME') or str(Path.home() / '.config')) / 'focus-music'
+USER_CONFIG = CONFIG_HOME / 'sources.json'
+LOCAL_CONFIG = Path(os.environ.get('FOCUS_MUSIC_LOCAL_CONFIG') or str(CONFIG_HOME / 'local-sources.json'))
 CONFIG = Path(os.environ.get('FOCUS_MUSIC_CONFIG') or str(USER_CONFIG if USER_CONFIG.exists() else PACKAGE / 'data/sources.json'))
 RUNTIME = Path(os.environ.get('FOCUS_MUSIC_RUNTIME') or str(Path(os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}') / 'focus-music'))
 RUNTIME.mkdir(mode=0o700, parents=True, exist_ok=True)
 SOCKET = RUNTIME / 'mpv.sock'
 STATE = Path(os.environ.get('FOCUS_MUSIC_STATE') or str(Path(os.environ.get('XDG_STATE_HOME') or str(Path.home() / '.local/state')) / 'focus-music/state.json'))
 STATE.parent.mkdir(parents=True, exist_ok=True)
-SOURCES = json.loads(CONFIG.read_text())
+SOURCE_DATA = CONFIG.read_bytes()
+LOCAL_DATA = LOCAL_CONFIG.read_bytes() if LOCAL_CONFIG.exists() else b''
+SOURCES = json.loads(SOURCE_DATA)
+if LOCAL_DATA:
+    SOURCES.update(json.loads(LOCAL_DATA)['genres'])
+CATALOG_REVISION = hashlib.sha256(SOURCE_DATA + b'\0' + LOCAL_DATA).hexdigest()
 
 
 def ipc_many(commands):
@@ -51,10 +62,13 @@ def prop(name):
 def state():
     for path in (STATE, RUNTIME / 'state.json'):
         try:
-            return json.loads(path.read_text())
+            saved = json.loads(path.read_text())
+            if saved.get('genre') not in SOURCES:
+                saved['genre'] = next(iter(SOURCES))
+            return saved
         except (OSError, ValueError):
             pass
-    return {'genre': 'lofi-hiphop', 'volume': 20}
+    return {'genre': 'lofi-hiphop' if 'lofi-hiphop' in SOURCES else next(iter(SOURCES)), 'volume': 20}
 
 
 def save(data):
@@ -140,17 +154,22 @@ def status():
             'track_count': count, 'title': title, 'artist': artist,
             'track_id': track['id'], 'banner': banner, 'volume': volume,
             'generation': str(saved.get('generation', 0)), 'normalization': normalization,
+            'catalog_revision': CATALOG_REVISION,
             'tooltip': f'Focus music · {phase}\n{banner}\n{source["label"]} · {count:,} tracks · {source["duration"]/3600:.1f} hours\n{volume}% volume\nRight-click: Play | Pause\nMiddle-click: Next · Scroll: volume',
             'class': phase.lower()}
 
 
-def ensure_player(saved):
+def ensure_player(saved, source):
+    needs_resolver = any(local_path(track) is None for track in source['tracks'])
+    resolver = shutil.which('yt-dlp')
+    if needs_resolver and not resolver:
+        raise RuntimeError('Streaming requires yt-dlp; local music works without it')
     try:
         prop('idle-active')
         return
     except (OSError, RuntimeError):
         pass
-    for dependency in ('mpv', 'yt-dlp'):
+    for dependency in ('mpv',):
         if not shutil.which(dependency):
             raise RuntimeError('Missing dependency: ' + dependency)
     SOCKET.unlink(missing_ok=True)
@@ -159,7 +178,7 @@ def ensure_player(saved):
             'mpv', '--no-config', '--no-video', '--idle=yes', '--keep-open=no',
             '--input-terminal=no', '--terminal=no', '--loop-file=no',
             '--loop-playlist=inf', '--audio-display=no', '--ytdl-format=bestaudio/best',
-            '--script-opts=ytdl_hook-ytdl_path=' + shutil.which('yt-dlp'),
+            *(['--script-opts=ytdl_hook-ytdl_path=' + resolver] if resolver else []),
             '--script=' + str(PACKAGE / 'scripts/normalizer'),
             f'--volume={saved.get("volume", 20)}',
             f'--input-ipc-server={SOCKET}', '--title=Focus music'],
@@ -179,7 +198,7 @@ def play(genre):
     source = SOURCES[genre]
     saved = state()
     commit(saved)
-    ensure_player(saved)
+    ensure_player(saved, source)
     deck = saved.setdefault('decks', {}).get(genre, {})
     order = deck.get('remaining', []) if deck.get('version') == source['catalog_version'] else []
     if not order:
@@ -226,8 +245,32 @@ def main():
         plugin_id = json.loads((PACKAGE / 'manifest.json').read_text())['id']
         os.execvp('omarchy-shell', ['omarchy-shell', 'shell', 'toggle', plugin_id])
     if action in ('--help', '-h', 'help'):
-        print('Usage: focus-music {menu|genres|play GENRE|toggle|previous|skip|stop|volume DELTA|status}')
-        print('Streams instrumental music from YouTube. Requires mpv >= 0.38 and yt-dlp.')
+        print('Usage: focus-music {menu|genres|play GENRE|toggle|previous|skip|stop|volume DELTA|status|local FOLDER|place left|place right|compact-bar}')
+        print('Play streamed or user-supplied local music. Local indexing requires ffprobe; streaming requires yt-dlp.')
+        return
+    if action == 'place':
+        side = sys.argv[2]
+        if side not in ('left', 'right'):
+            raise ValueError('Placement must be left or right')
+        plugin_id = json.loads((PACKAGE / 'manifest.json').read_text())['id']
+        subprocess.run(['omarchy', 'bar', 'move', plugin_id, '--section', 'center',
+                        '--before' if side == 'left' else '--after', 'omarchy.clock'], check=True)
+        return
+    if action == 'compact-bar':
+        subprocess.run([sys.executable, str(PACKAGE / 'scripts/configure-bar.py')], check=True)
+        return
+    if action == 'local':
+        library, skipped = index_library(sys.argv[2])
+        LOCAL_CONFIG.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary = LOCAL_CONFIG.with_suffix('.tmp')
+        temporary.write_text(json.dumps(library, ensure_ascii=False, indent=2))
+        temporary.chmod(0o600)
+        temporary.replace(LOCAL_CONFIG)
+        print(json.dumps({'genres': [{'value': key, 'label': genre['label'],
+                                     'track_count': len(genre['tracks']),
+                                     'hours': round(genre['duration'] / 3600, 1)}
+                                    for key, genre in library['genres'].items()],
+                          'skipped_files': skipped}))
         return
     if action == 'genres':
         print(json.dumps([{'value': key, 'label': source['label'],
@@ -310,7 +353,7 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (OSError, RuntimeError, ValueError, KeyError, IndexError) as error:
+    except (OSError, RuntimeError, ValueError, KeyError, IndexError, subprocess.SubprocessError) as error:
         notify(str(error))
         print(str(error), file=sys.stderr)
         sys.exit(1)
