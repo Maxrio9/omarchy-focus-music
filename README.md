@@ -2,7 +2,7 @@
 
 Instrumental background music, one click from your desktop bar. Pick a genre, see the artist and track name, and control playback with your mouse.
 
-![Focus Music bar and genre selector](docs/preview.png)
+![Focus Music bar and genre selector](preview.png)
 
 ## Features
 
