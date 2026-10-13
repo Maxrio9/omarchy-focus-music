@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "maxrio9.focus-music",
   "name": "Focus Music",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "author": "Maxrio9",
   "license": "MIT",
   "description": "Instrumental focus music with shuffled playlists, a scrolling track banner, genre selector and mouse controls.",

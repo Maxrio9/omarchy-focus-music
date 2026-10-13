@@ -3,8 +3,10 @@ import qs.Commons
 
 Item {
     property string button: "right"
-    width: Style.space(button === "scroll" ? 28 : 15)
-    height: Style.space(21)
+    implicitWidth: Style.space(button === "scroll" ? 28 : 15)
+    implicitHeight: Style.space(21)
+    width: implicitWidth
+    height: implicitHeight
     Rectangle {
         width: Style.space(15)
         height: parent.height
