@@ -26,6 +26,8 @@ Right-click, middle-click, and scrolling also work anywhere over the open popup.
 
 Music starts at 20% player volume and remembers volume changes. It does not change your system volume.
 
+Open Focus Music from its bar widget. Installation does not add an entry to the Super + Space menu. If you previously added a custom shortcut, remove the `"focus-music"` entry from `~/.config/omarchy/extensions/omarchy-menu.jsonc`; the bar widget and playback keep working.
+
 ## Install
 
 Requires **Omarchy 4's Quickshell bar** with the `qs.Commons` and `qs.Ui` components (`PopupCard`, `Dropdown`, and the bar buttons), Python 3.8+, and **mpv 0.38+**. Streaming requires a recent yt-dlp; local indexing and loudness measurement require FFmpeg. Tested on Omarchy 4.0.4 with mpv 0.41. Other Omarchy versions must provide the same shell UI API. A plain Hyprland installation or a Waybar-based Omarchy bar can use the command-line player; the QML widget requires the Omarchy shell. `notify-send` is optional and provides error notifications.
