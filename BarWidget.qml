@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import QtQuick.Layouts
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
@@ -10,16 +11,17 @@ BarWidget {
     readonly property string controllerPath: decodeURIComponent(String(Qt.resolvedUrl("bin/focus-music")).replace(/^file:\/\//, ""))
     property var genres: []
     property bool popupOpen: false
+    property bool popupPinned: false
     readonly property bool opened: popupOpen
-    function open() { popupOpen = true }
-    function close() { popupOpen = false }
+    function open() { popupPinned = true; popupOpen = true }
+    function close() { popupOpen = false; popupPinned = false }
     function runAction(action, argument) {
         var command = ["python3", controllerPath, action]
         if (argument !== undefined) command.push(String(argument))
         Quickshell.execDetached(command)
     }
     property var player: ({text: "󰎈", phase: "Stopped", banner: "Focus music", tooltip: "Focus music — click to choose a genre"})
-    implicitWidth: button.implicitWidth + nextButton.implicitWidth
+    implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
 
     Process {
@@ -57,11 +59,18 @@ BarWidget {
         labelVisible: false
         hasVisualContent: true
         fixedWidth: root.vertical ? Style.bar.statusSlot : Style.space(Math.max(80, Math.min(500, Number(root.setting("bannerWidth", 180)) || 180)))
-        tooltipText: root.player.tooltip
+        tooltipText: ""
+        onTooltipHoveredChanged: {
+            if (tooltipHovered) { closeHover.stop(); root.popupOpen = true }
+            else closeHover.restart()
+        }
         onPressed: function(b) {
             if (b === Qt.RightButton) root.runAction("toggle")
             else if (b === Qt.MiddleButton) root.runAction("skip")
-            else root.popupOpen = !root.popupOpen
+            else {
+                root.popupPinned = !root.popupPinned
+                root.popupOpen = root.popupPinned
+            }
         }
         onWheelMoved: function(delta) {
             root.runAction("volume", delta > 0 ? 5 : -5)
@@ -141,17 +150,11 @@ BarWidget {
             }
         }
     }
-    BarIconButton {
-        id: nextButton
-        anchors.left: button.right
-        height: parent.height
-        width: implicitWidth
-        bar: root.bar
-        text: "󰒭"
-        tooltipText: "Next track · also middle-click the music banner"
-        slotSize: Style.bar.statusSlot
-        onPressed: function(b) {
-            root.runAction("skip")
+    Timer {
+        id: closeHover
+        interval: 450
+        onTriggered: {
+            if (!root.popupPinned && !button.tooltipHovered && !popup.containsMouse && !genreSelect.popupOpen) root.close()
         }
     }
     PopupCard {
@@ -160,7 +163,12 @@ BarWidget {
         bar: root.bar
         owner: root
         open: root.popupOpen
-        contentWidth: popup.fittedContentWidth(Style.space(340))
+        triggerMode: root.popupPinned ? "click" : "hover"
+        onContainsMouseChanged: {
+            if (containsMouse) closeHover.stop()
+            else closeHover.restart()
+        }
+        contentWidth: popup.fittedContentWidth(Style.space(380))
         contentHeight: popup.fittedContentHeight(controls.implicitHeight)
         Column {
             id: controls
@@ -175,6 +183,8 @@ BarWidget {
                 font.bold: true
             }
             Dropdown {
+                id: genreSelect
+                onPopupOpenChanged: if (!genreSelect.popupOpen) closeHover.restart()
                 width: parent.width
                 label: "Genre"
                 options: root.genres
@@ -190,33 +200,62 @@ BarWidget {
                 font.family: Style.font.family
                 font.pixelSize: Style.font.body
             }
-            Text {
+            RowLayout {
                 width: parent.width
-                text: {
-                    for (var i = 0; i < root.genres.length; i++) {
-                        var g = root.genres[i]
-                        if (g.value === root.player.genre) return g.track_count.toLocaleString() + " tracks · " + g.hours + " hours"
+                spacing: Style.space(8)
+                Text {
+                    Layout.fillWidth: true
+                    text: {
+                        for (var i = 0; i < root.genres.length; i++) {
+                            var g = root.genres[i]
+                            if (g.value === root.player.genre) return g.track_count.toLocaleString() + " tracks · " + g.hours + " hours"
+                        }
+                        return ""
                     }
-                    return ""
+                    elide: Text.ElideRight
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
                 }
-                color: Qt.darker(Color.foreground, 1.3)
-                font.family: Style.font.family
-                font.pixelSize: Style.font.caption
+                Rectangle {
+                    implicitWidth: Style.space(44)
+                    implicitHeight: Style.space(2)
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+                    Rectangle {
+                        width: parent.width * Math.max(0, Math.min(100, root.player.volume || 0)) / 100
+                        height: parent.height
+                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
+                    }
+                }
+                Text {
+                    text: (root.player.volume === undefined ? 20 : root.player.volume) + "%"
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                }
             }
-            Row {
+            RowLayout {
+                width: parent.width
                 spacing: Style.space(8)
                 Button {
-                    iconText: root.player.phase === "Playing" ? "󰏤" : "󰐊"
-                    text: root.player.phase === "Playing" ? "Pause" : "Play"
+                    Layout.fillWidth: true
+                    text: "Play | Pause"
+                    active: root.player.phase === "Playing"
+                    bordered: true
+                    focusable: true
                     onClicked: root.runAction("toggle")
                 }
-                Button { iconText: "󰒭"; text: "Next"; onClicked: root.runAction("skip") }
-                Button { iconText: "󰓛"; text: "Stop"; onClicked: root.runAction("stop") }
+                Button { Layout.fillWidth: true; text: "Previous"; bordered: true; focusable: true; onClicked: root.runAction("previous") }
+                Button { Layout.fillWidth: true; text: "Next"; bordered: true; focusable: true; onClicked: root.runAction("skip") }
             }
-            Row {
-                spacing: Style.space(8)
-                Button { iconText: "󰕿"; text: "Quieter"; onClicked: root.runAction("volume", -5) }
-                Button { iconText: "󰕾"; text: "Louder"; onClicked: root.runAction("volume", 5) }
+            Text {
+                width: parent.width
+                text: "Left-click: pin controls\nRight-click: Play | Pause\nMiddle-click: Next · Scroll: volume"
+                textFormat: Text.PlainText
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+                lineHeight: 1.4
             }
         }
     }

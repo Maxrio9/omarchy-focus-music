@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+"""Measure complete track loudness; return a fixed, peak-safe gain to mpv."""
+import fcntl
+import hashlib
+import importlib.machinery
+import importlib.util
+import json
+import math
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+ROOT = Path(__file__).resolve().parent.parent
+loader = importlib.machinery.SourceFileLoader('focus_music_controller', str(ROOT / 'bin/focus-music'))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+player = importlib.util.module_from_spec(spec)
+loader.exec_module(player)
+CACHE = Path(os.environ.get('FOCUS_MUSIC_CACHE') or str(Path(os.environ.get('XDG_CACHE_HOME') or str(Path.home() / '.cache')) / 'focus-music/loudness'))
+
+
+def gain_for(loudness, peak, target=-23.0, ceiling=-2.0):
+    """One gain for the whole piece; never compress its loud/quiet contrast."""
+    if not math.isfinite(loudness) or not math.isfinite(peak) or loudness < -60:
+        return 0.0
+    return round(min(max(target - loudness, -30.0), 12.0, ceiling - peak), 2)
+
+
+def parse_measurement(log):
+    summary = log.rsplit('Summary:', 1)[-1]
+    integrated = re.search(r'\bI:\s*(-?[\d.]+)\s*LUFS', summary)
+    peak = re.search(r'True peak:\s*Peak:\s*(-?[\d.]+)\s*dBFS', summary, re.S)
+    if not integrated or not peak:
+        raise RuntimeError('Could not measure track loudness')
+    result = {'loudness_lufs': float(integrated[1]), 'true_peak_dbfs': float(peak[1])}
+    if not all(math.isfinite(v) for v in result.values()):
+        raise RuntimeError('Track has no measurable audio')
+    return result
+
+
+def measure_source(url, start, duration, cancel=None):
+    command = ['ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'info',
+               '-threads', '1', '-ss', str(start), '-i', url, '-t', str(duration), '-vn', '-sn', '-dn',
+               '-af', 'ebur128=peak=true:framelog=quiet:dualmono=true', '-f', 'null', '-']
+    process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    deadline = time.monotonic() + max(240, duration * 2 + 60)
+    try:
+        while True:
+            try:
+                _, log = process.communicate(timeout=3)
+                break
+            except subprocess.TimeoutExpired:
+                if time.monotonic() > deadline or (cancel and cancel()):
+                    raise RuntimeError('Loudness analysis superseded or timed out')
+        if process.returncode:
+            # Signed streaming URLs and decoder logs stay out of errors and caches.
+            raise RuntimeError('Track loudness analysis failed')
+        return parse_measurement(log)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate()
+
+
+def cache_path(track):
+    signature = hashlib.sha256(json.dumps([track['url'], track['start'], track['end']], separators=(',', ':')).encode()).hexdigest()
+    return CACHE / (signature + '.json')
+
+
+def cached_measurement(track):
+    try:
+        result = json.loads(cache_path(track).read_text())
+        if result.get('schema') == 1 and all(math.isfinite(result[key]) for key in ('loudness_lufs', 'true_peak_dbfs')):
+            return result
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+def measurement(track, cancel=None):
+    cache_file = cache_path(track)
+    result = cached_measurement(track)
+    if result is not None:
+        return result
+    resolver = subprocess.run(['yt-dlp', '--no-warnings', '--no-playlist', '-f', 'bestaudio', '-g', track['url']],
+                              capture_output=True, text=True, timeout=90)
+    if resolver.returncode or not resolver.stdout.strip():
+        raise RuntimeError('Could not resolve audio for loudness analysis')
+    result = measure_source(resolver.stdout.strip().splitlines()[0], track['start'], track['duration'], cancel=cancel)
+    result.update(schema=1, measured_at=int(time.time()))
+    CACHE.mkdir(parents=True, exist_ok=True)
+    temporary = cache_file.with_suffix('.' + str(os.getpid()) + '.tmp')
+    temporary.write_text(json.dumps(result))
+    temporary.replace(cache_file)
+    return result
+
+
+def selected_track(index):
+    saved = player.state()
+    source = player.SOURCES[saved['genre']]
+    order = saved.get('active_order', [])
+    if saved.get('catalog_version') != source['catalog_version'] or not 0 <= index < len(order):
+        raise RuntimeError('Playlist is not indexed')
+    return source['tracks'][order[index]]
+
+
+def superseded(index, generation, prefetch=False):
+    if player.state().get('generation') != generation:
+        return True
+    try:
+        current = player.prop('playlist-pos')
+        return current is None or (current > index if prefetch else current != index)
+    except (OSError, RuntimeError):
+        return True
+
+
+def main():
+    if os.environ.get('FOCUS_MUSIC_NORMALIZE', '1') == '0':
+        return {'state': 'off', 'gain_db': 0}
+    if not all(shutil.which(dependency) for dependency in ('ffmpeg', 'yt-dlp')):
+        return {'state': 'unavailable', 'gain_db': 0}
+    os.nice(10)
+    mode = sys.argv[1] if len(sys.argv) > 1 else 'current'
+    index = int(sys.argv[2])
+    generation = int(sys.argv[3])
+    if player.state().get('generation') != generation:
+        return {'state': 'superseded', 'gain_db': 0}
+    if mode != 'prefetch':
+        cached = cached_measurement(selected_track(index))
+        if cached is not None:
+            return {'state': 'ready', 'gain_db': gain_for(cached['loudness_lufs'], cached['true_peak_dbfs'])}
+    with (player.RUNTIME / 'normalize.lock').open('w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return {'state': 'pending', 'gain_db': 0}
+        if mode == 'prefetch':
+            for offset in (1, 2):
+                if player.state().get('generation') != generation:
+                    break
+                try:
+                    measurement(selected_track(index + offset), cancel=lambda: superseded(index + offset, generation, prefetch=True))
+                except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired):
+                    continue
+            return {'state': 'prefetched', 'gain_db': 0}
+        track = selected_track(index)
+        result = measurement(track, cancel=lambda: superseded(index, generation))
+        return {'state': 'ready', 'gain_db': gain_for(result['loudness_lufs'], result['true_peak_dbfs'])}
+
+
+if __name__ == '__main__':
+    try:
+        result = main()
+    except (OSError, RuntimeError, ValueError, IndexError, KeyError, subprocess.TimeoutExpired):
+        result = {'state': 'unavailable', 'gain_db': 0}
+    print(json.dumps(result))

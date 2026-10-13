@@ -122,6 +122,11 @@ class PlayerTests(unittest.TestCase):
         if command[0] == 'loadfile' and command[2] == 'replace':
             self.props.update({'path': command[1], 'playlist-pos': 0, 'idle-active': False,
                                'time-pos': float(command[4]['start'])})
+        elif command[0] == 'playlist-prev':
+            self.props['playlist-pos'] -= 1
+            saved = self.player.state()
+            track = self.player.SOURCES[saved['genre']]['tracks'][saved['active_order'][self.props['playlist-pos']]]
+            self.props.update(path=track['url'], **{'time-pos': track['start']})
         elif command[0] == 'set_property':
             self.props[command[1]] = command[2]
         elif command[0] == 'get_property':
@@ -144,6 +149,22 @@ class PlayerTests(unittest.TestCase):
         self.assertEqual(float(last_replace[4]['start']), chosen['start'])
         self.assertEqual(float(last_replace[4]['end']), chosen['end'])
 
+    def test_previous_moves_back_and_restarts_the_first_track_at_its_boundary(self):
+        self.player.play('piano')
+        order = self.player.state()['active_order']
+        self.props['playlist-pos'] = 1
+        self.props['path'] = self.player.SOURCES['piano']['tracks'][order[1]]['url']
+        with patch.object(self.player.sys, 'argv', ['focus-music', 'previous']):
+            self.player.main()
+        self.assertEqual(self.props['playlist-pos'], 0)
+        self.assertIn(['playlist-prev', 'force'], self.commands)
+        self.commands.clear()
+        with patch.object(self.player.sys, 'argv', ['focus-music', 'previous']):
+            self.player.main()
+        expected = self.player.SOURCES['piano']['tracks'][order[0]]['start']
+        self.assertIn(['seek', expected, 'absolute+exact'], self.commands)
+        self.assertNotIn(['playlist-prev', 'force'], self.commands)
+
     def test_status_reports_actual_track_and_artist(self):
         self.player.play('piano')
         current = self.player.state()['active_order'][0]
@@ -151,6 +172,8 @@ class PlayerTests(unittest.TestCase):
         self.assertEqual(status['title'], 'Track ' + str(current))
         self.assertEqual(status['artist'], 'Artist')
         self.assertEqual(status['phase'], 'Playing')
+        self.assertEqual(status['volume'], 20)
+        self.assertNotIn('⏭', status['tooltip'])
 
 
 class IpcTests(unittest.TestCase):

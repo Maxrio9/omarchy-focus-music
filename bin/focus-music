@@ -126,6 +126,11 @@ def status():
             phase = 'Loading'
     except (OSError, RuntimeError, ValueError):
         pass
+    normalization = {'state': 'off', 'gain_db': 0}
+    try:
+        normalization = prop('user-data/focus-music-normalization') or normalization
+    except (OSError, RuntimeError, KeyError):
+        pass
     number, track = active_track(saved, position, index, path)
     title, artist = track['title'], track['artist']
     banner = f'{artist} — {title}' if artist else title
@@ -133,8 +138,9 @@ def status():
     return {'text': '󰎈' if phase == 'Stopped' else ('󰏤' if phase == 'Paused' else '󰎆'),
             'phase': phase, 'genre': saved['genre'], 'track': number + 1,
             'track_count': count, 'title': title, 'artist': artist,
-            'track_id': track['id'], 'banner': banner,
-            'tooltip': f'Focus music · {phase}\n{banner}\n{source["label"]} · {count:,} tracks · {source["duration"]/3600:.1f} hours\n{volume}% volume\nLeft: menu · Right: pause/resume · Middle: next track\nScroll: volume · ⏭: next track',
+            'track_id': track['id'], 'banner': banner, 'volume': volume,
+            'generation': str(saved.get('generation', 0)), 'normalization': normalization,
+            'tooltip': f'Focus music · {phase}\n{banner}\n{source["label"]} · {count:,} tracks · {source["duration"]/3600:.1f} hours\n{volume}% volume\nLeft-click: controls · Right-click: Play | Pause\nMiddle-click: Next · Scroll: volume',
             'class': phase.lower()}
 
 
@@ -154,6 +160,7 @@ def ensure_player(saved):
             '--input-terminal=no', '--terminal=no', '--loop-file=no',
             '--loop-playlist=inf', '--audio-display=no', '--ytdl-format=bestaudio/best',
             '--script-opts=ytdl_hook-ytdl_path=' + shutil.which('yt-dlp'),
+            '--script=' + str(PACKAGE / 'scripts/normalizer'),
             f'--volume={saved.get("volume", 20)}',
             f'--input-ipc-server={SOCKET}', '--title=Focus music'],
             stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
@@ -216,9 +223,10 @@ def wait_ready(generation):
 def main():
     action = sys.argv[1] if len(sys.argv) > 1 else 'menu'
     if action == 'menu':
-        os.execvp('omarchy-shell', ['omarchy-shell', 'shell', 'toggle', 'maxrio9.focus-music'])
+        plugin_id = json.loads((PACKAGE / 'manifest.json').read_text())['id']
+        os.execvp('omarchy-shell', ['omarchy-shell', 'shell', 'toggle', plugin_id])
     if action in ('--help', '-h', 'help'):
-        print('Usage: focus-music {menu|genres|play GENRE|toggle|skip|stop|volume DELTA|status}')
+        print('Usage: focus-music {menu|genres|play GENRE|toggle|previous|skip|stop|volume DELTA|status}')
         print('Streams instrumental music from YouTube. Requires mpv >= 0.38 and yt-dlp.')
         return
     if action == 'genres':
@@ -248,6 +256,19 @@ def main():
                 generation = play(state()['genre'])
             else:
                 ipc(['playlist-next', 'force'])
+                ipc(['set_property', 'pause', False])
+        elif action == 'previous':
+            current = status()
+            if current['phase'] == 'Stopped' or current['track_id'] == 'unknown':
+                generation = play(state()['genre'])
+            else:
+                index = prop('playlist-pos') or 0
+                if index > 0:
+                    ipc(['playlist-prev', 'force'])
+                else:
+                    saved = state()
+                    track = SOURCES[saved['genre']]['tracks'][saved['active_order'][0]]
+                    ipc(['seek', track['start'], 'absolute+exact'])
                 ipc(['set_property', 'pause', False])
         elif action == 'stop':
             saved = state()
