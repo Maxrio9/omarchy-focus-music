@@ -245,6 +245,7 @@ BarWidget {
             anchors.fill: parent
             anchors.margins: -popup.padding
             z: 10
+            enabled: !genreSelect.popupOpen
             acceptedButtons: Qt.RightButton | Qt.MiddleButton
             onClicked: function(mouse) {
                 if (mouse.button === Qt.RightButton) root.togglePlayback()
@@ -289,8 +290,10 @@ BarWidget {
                     font.pixelSize: Style.font.caption
                 }
             }
-            Dropdown {
+            GenreSelector {
                 id: genreSelect
+                objectName: "genreSelector"
+                maximumListHeight: Math.max(Style.space(32), Math.min(Style.space(200), popup.availableCardHeight - popup.verticalContentInset - Style.space(250)))
                 onPopupOpenChanged: if (!genreSelect.popupOpen) closeHover.restart()
                 width: parent.width
                 label: "Genre"
