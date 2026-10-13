@@ -21,6 +21,33 @@ BarWidget {
         Quickshell.execDetached(command)
     }
     property var player: ({text: "󰎈", phase: "Stopped", banner: "Focus music", tooltip: "Focus music — click to choose a genre"})
+    property real displayedVolume: 20
+    property bool volumePending: false
+    onPlayerChanged: {
+        if (!volumeChange.running && !volumePending && player.volume !== undefined)
+            displayedVolume = player.volume
+    }
+    function adjustVolume(delta) {
+        displayedVolume = Math.max(0, Math.min(100, displayedVolume + delta))
+        volumePending = true
+        flushVolume()
+    }
+    function flushVolume() {
+        if (volumeChange.running || !volumePending) return
+        volumePending = false
+        volumeChange.command = ["python3", controllerPath, "volume-set", String(displayedVolume)]
+        volumeChange.running = true
+    }
+    Process {
+        id: volumeChange
+        stdout: StdioCollector { id: volumeResult }
+        onExited: function(exitCode) {
+            if (!root.volumePending && exitCode === 0) {
+                try { root.displayedVolume = JSON.parse(volumeResult.text).volume } catch (e) {}
+            }
+            Qt.callLater(root.flushVolume)
+        }
+    }
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
 
@@ -44,7 +71,7 @@ BarWidget {
         }
     }
     Timer {
-        interval: 2000
+        interval: root.popupOpen ? 400 : 2000
         running: true
         repeat: true
         triggeredOnStart: true
@@ -73,7 +100,7 @@ BarWidget {
             }
         }
         onWheelMoved: function(delta) {
-            root.runAction("volume", delta > 0 ? 5 : -5)
+            root.adjustVolume(delta > 0 ? 5 : -5)
         }
         OpticalGlyph {
             id: glyph
@@ -174,13 +201,33 @@ BarWidget {
             id: controls
             anchors.fill: parent
             spacing: Style.space(10)
-            Text {
+            RowLayout {
                 width: parent.width
-                text: "Focus Music"
-                color: Color.foreground
-                font.family: Style.font.family
-                font.pixelSize: Style.font.subtitle
-                font.bold: true
+                spacing: Style.space(8)
+                Text {
+                    Layout.fillWidth: true
+                    text: "Focus Music"
+                    color: Color.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.subtitle
+                    font.bold: true
+                }
+                Rectangle {
+                    implicitWidth: Style.space(44)
+                    implicitHeight: Style.space(2)
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+                    Rectangle {
+                        width: parent.width * root.displayedVolume / 100
+                        height: parent.height
+                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
+                    }
+                }
+                Text {
+                    text: Math.round(root.displayedVolume) + "%"
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.caption
+                }
             }
             Dropdown {
                 id: genreSelect
@@ -217,40 +264,61 @@ BarWidget {
                     font.family: Style.font.family
                     font.pixelSize: Style.font.caption
                 }
-                Rectangle {
-                    implicitWidth: Style.space(44)
-                    implicitHeight: Style.space(2)
-                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
-                    Rectangle {
-                        width: parent.width * Math.max(0, Math.min(100, root.player.volume || 0)) / 100
-                        height: parent.height
-                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
-                    }
-                }
-                Text {
-                    text: (root.player.volume === undefined ? 20 : root.player.volume) + "%"
-                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.caption
-                }
             }
             RowLayout {
+                id: playbackControls
                 width: parent.width
                 spacing: Style.space(8)
+                readonly property real buttonWidth: (width - spacing * 2) / 3
                 Button {
-                    Layout.fillWidth: true
-                    text: "Play | Pause"
+                    Layout.preferredWidth: playbackControls.buttonWidth
+                    Layout.minimumWidth: playbackControls.buttonWidth
+                    Layout.maximumWidth: playbackControls.buttonWidth
+                    Layout.preferredHeight: Style.space(36)
+                    text: "Previous"
+                    bordered: true
+                    focusable: true
+                    onClicked: root.runAction("previous")
+                }
+                Button {
+                    Layout.preferredWidth: playbackControls.buttonWidth
+                    Layout.minimumWidth: playbackControls.buttonWidth
+                    Layout.maximumWidth: playbackControls.buttonWidth
+                    Layout.preferredHeight: Style.space(36)
+                    text: root.player.phase === "Playing" ? "Pause" : "Play"
                     active: root.player.phase === "Playing"
                     bordered: true
                     focusable: true
+                    tooltipText: "Right-click the banner to play or pause"
                     onClicked: root.runAction("toggle")
+                    MouseHint {
+                        button: "right"
+                        anchors.right: parent.right
+                        anchors.rightMargin: Style.space(8)
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
                 }
-                Button { Layout.fillWidth: true; text: "Previous"; bordered: true; focusable: true; onClicked: root.runAction("previous") }
-                Button { Layout.fillWidth: true; text: "Next"; bordered: true; focusable: true; onClicked: root.runAction("skip") }
+                Button {
+                    Layout.preferredWidth: playbackControls.buttonWidth
+                    Layout.minimumWidth: playbackControls.buttonWidth
+                    Layout.maximumWidth: playbackControls.buttonWidth
+                    Layout.preferredHeight: Style.space(36)
+                    text: "Next"
+                    bordered: true
+                    focusable: true
+                    tooltipText: "Middle-click the banner for the next track"
+                    onClicked: root.runAction("skip")
+                    MouseHint {
+                        button: "middle"
+                        anchors.right: parent.right
+                        anchors.rightMargin: Style.space(8)
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
             }
             Text {
                 width: parent.width
-                text: "Left-click: pin controls\nRight-click: Play | Pause\nMiddle-click: Next · Scroll: volume"
+                text: "Right-click: Play | Pause\nMiddle-click: Next · Scroll: volume"
                 textFormat: Text.PlainText
                 color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
                 font.family: Style.font.family

@@ -92,6 +92,13 @@ class DeploymentTests(unittest.TestCase):
                     self.assertEqual(json.loads(result.stdout)['phase'], 'Stopped')
                     subprocess.run(command + ['volume', '5'], env=env, cwd=install,
                                    capture_output=True, text=True, check=True)
+                    for requested, expected in [('100', 100), ('95', 95), ('-5', 0), ('30', 30)]:
+                        result = subprocess.run(command + ['volume-set', requested], env=env,
+                                                cwd=install, capture_output=True, text=True, check=True)
+                        self.assertEqual(json.loads(result.stdout)['volume'], expected)
+                    result = subprocess.run(command + ['status'], env=env, cwd=install,
+                                            capture_output=True, text=True, check=True)
+                    self.assertEqual(json.loads(result.stdout)['volume'], 30)
                     state_root = Path(env.get('XDG_STATE_HOME') or home / '.local/state')
                     self.assertTrue((state_root / 'focus-music/state.json').exists())
                     self.assertFalse((install / 'focus-music/state.json').exists())

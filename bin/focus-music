@@ -140,7 +140,7 @@ def status():
             'track_count': count, 'title': title, 'artist': artist,
             'track_id': track['id'], 'banner': banner, 'volume': volume,
             'generation': str(saved.get('generation', 0)), 'normalization': normalization,
-            'tooltip': f'Focus music · {phase}\n{banner}\n{source["label"]} · {count:,} tracks · {source["duration"]/3600:.1f} hours\n{volume}% volume\nLeft-click: controls · Right-click: Play | Pause\nMiddle-click: Next · Scroll: volume',
+            'tooltip': f'Focus music · {phase}\n{banner}\n{source["label"]} · {count:,} tracks · {source["duration"]/3600:.1f} hours\n{volume}% volume\nRight-click: Play | Pause\nMiddle-click: Next · Scroll: volume',
             'class': phase.lower()}
 
 
@@ -279,18 +279,19 @@ def main():
                 ipc(['quit'])
             except OSError:
                 pass
-        elif action == 'volume':
+        elif action in ('volume', 'volume-set'):
             saved = state()
             try:
                 current = prop('volume')
             except OSError:
                 current = saved.get('volume', 20)
-            saved['volume'] = max(0, min(100, current + int(sys.argv[2])))
+            saved['volume'] = max(0, min(100, float(sys.argv[2]) if action == 'volume-set' else current + int(sys.argv[2])))
             save(saved)
             try:
                 ipc(['set_property', 'volume', saved['volume']])
             except OSError:
                 pass
+            print(json.dumps({'volume': saved['volume']}))
         else:
             raise ValueError('Unknown action: ' + action)
     if generation is not None:
