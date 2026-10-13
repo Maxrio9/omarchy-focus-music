@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="300" viewBox="0 0 860 300" role="img" aria-labelledby="title desc">
+<title id="title">Focus Music for Omarchy</title>
+<desc id="desc">An illustrative bar showing a scrolling Chopin track, date and weather, with a genre dropdown and playback controls.</desc>
+<rect width="860" height="300" rx="14" fill="#101318"/>
+<rect x="18" y="18" width="824" height="40" rx="8" fill="#202530"/>
+<g fill="#c9d2e8" font-family="monospace" font-size="14">
+<text x="38" y="44">1  2  3</text><text x="179" y="44">♫  Chopin — Nocturne, Op. 9...</text><text x="460" y="44">▸│</text><text x="512" y="44">Tuesday 14:32</text><text x="672" y="44">☁</text><text x="755" y="44">◖  ◉</text>
+</g>
+<rect x="165" y="75" width="366" height="205" rx="10" fill="#202530" stroke="#46516a"/>
+<g font-family="monospace" fill="#c9d2e8">
+<text x="185" y="105" font-size="18" font-weight="bold">Focus Music</text>
+<text x="185" y="130" font-size="11" fill="#939eb6">GENRE</text>
+<rect x="185" y="139" width="326" height="32" rx="5" fill="#303848" stroke="#46516a"/>
+<text x="196" y="160" font-size="13">Gentle classical piano</text><text x="487" y="160" font-size="14">⌄</text>
+<text x="185" y="194" font-size="13">Chopin — Nocturne, Op. 9, No. 2</text>
+<text x="185" y="215" font-size="11" fill="#939eb6">477 tracks · 35.3 hours</text>
+<rect x="185" y="230" width="90" height="30" rx="5" fill="#303848"/><rect x="285" y="230" width="90" height="30" rx="5" fill="#303848"/><rect x="385" y="230" width="90" height="30" rx="5" fill="#303848"/>
+<text x="197" y="250" font-size="12">Ⅱ Pause</text><text x="302" y="250" font-size="12">▸│ Next</text><text x="405" y="250" font-size="12">■ Stop</text>
+<text x="560" y="133" font-size="19" font-weight="bold">Music without the fuss.</text>
+<text x="560" y="165" font-size="13" fill="#939eb6">Five instrumental genres.</text><text x="560" y="190" font-size="13" fill="#939eb6">Shuffle, scroll, pause, skip.</text><text x="560" y="215" font-size="13" fill="#939eb6">One place in your desktop bar.</text>
+<text x="560" y="263" font-size="10" fill="#69758b">Illustration · follows your Omarchy theme</text>
+</g></svg>
