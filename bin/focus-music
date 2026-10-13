@@ -246,6 +246,13 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX)
         if action == 'play':
             generation = play(sys.argv[2])
+        elif action == 'pause-set':
+            paused = bool(int(sys.argv[2]))
+            if status()['phase'] == 'Stopped':
+                if not paused:
+                    generation = play(state()['genre'])
+            else:
+                ipc(['set_property', 'pause', paused])
         elif action == 'toggle':
             if status()['phase'] == 'Stopped':
                 generation = play(state()['genre'])
@@ -296,6 +303,8 @@ def main():
             raise ValueError('Unknown action: ' + action)
     if generation is not None:
         wait_ready(generation)
+    if action == 'pause-set':
+        print(json.dumps(status(), ensure_ascii=False))
 
 
 if __name__ == '__main__':

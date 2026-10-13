@@ -21,6 +21,34 @@ BarWidget {
         Quickshell.execDetached(command)
     }
     property var player: ({text: "󰎈", phase: "Stopped", banner: "Focus music", tooltip: "Focus music — click to choose a genre"})
+    property string playbackOverride: ""
+    property bool playbackPending: false
+    readonly property string playbackPhase: playbackOverride || player.phase
+    function togglePlayback() {
+        playbackOverride = playbackPhase === "Playing" ? "Paused" : "Playing"
+        playbackPending = true
+        flushPlayback()
+    }
+    function flushPlayback() {
+        if (playbackChange.running || !playbackPending) return
+        playbackPending = false
+        playbackChange.command = ["python3", controllerPath, "pause-set", playbackOverride === "Paused" ? "1" : "0"]
+        playbackChange.running = true
+    }
+    Process {
+        id: playbackChange
+        stdout: StdioCollector { id: playbackResult }
+        onExited: function(exitCode) {
+            if (!root.playbackPending) {
+                if (exitCode === 0) {
+                    try { root.player = JSON.parse(playbackResult.text) } catch (e) {}
+                }
+                root.playbackOverride = ""
+                if (!poll.running) poll.running = true
+            }
+            Qt.callLater(root.flushPlayback)
+        }
+    }
     property real displayedVolume: 20
     property bool volumePending: false
     onPlayerChanged: {
@@ -92,7 +120,7 @@ BarWidget {
             else closeHover.restart()
         }
         onPressed: function(b) {
-            if (b === Qt.RightButton) root.runAction("toggle")
+            if (b === Qt.RightButton) root.togglePlayback()
             else if (b === Qt.MiddleButton) root.runAction("skip")
             else {
                 root.popupPinned = !root.popupPinned
@@ -197,6 +225,23 @@ BarWidget {
         }
         contentWidth: popup.fittedContentWidth(Style.space(380))
         contentHeight: popup.fittedContentHeight(controls.implicitHeight)
+        MouseArea {
+            objectName: "popupInput"
+            // Include card padding, while leaving left-click controls below it.
+            anchors.fill: parent
+            anchors.margins: -popup.padding
+            z: 10
+            acceptedButtons: Qt.RightButton | Qt.MiddleButton
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.RightButton) root.togglePlayback()
+                else root.runAction("skip")
+            }
+            onWheel: function(event) {
+                var delta = event.angleDelta.y || event.pixelDelta.y
+                if (delta !== 0) root.adjustVolume(delta > 0 ? 5 : -5)
+                event.accepted = true
+            }
+        }
         Column {
             id: controls
             anchors.fill: parent
@@ -212,6 +257,7 @@ BarWidget {
                     font.pixelSize: Style.font.subtitle
                     font.bold: true
                 }
+                MouseHint { button: "scroll" }
                 Rectangle {
                     implicitWidth: Style.space(44)
                     implicitHeight: Style.space(2)
@@ -275,6 +321,7 @@ BarWidget {
                     Layout.minimumWidth: playbackControls.buttonWidth
                     Layout.maximumWidth: playbackControls.buttonWidth
                     Layout.preferredHeight: Style.space(36)
+                    objectName: "previousTrack"
                     text: "Previous"
                     bordered: true
                     focusable: true
@@ -285,12 +332,13 @@ BarWidget {
                     Layout.minimumWidth: playbackControls.buttonWidth
                     Layout.maximumWidth: playbackControls.buttonWidth
                     Layout.preferredHeight: Style.space(36)
-                    text: root.player.phase === "Playing" ? "Pause" : "Play"
-                    active: root.player.phase === "Playing"
+                    objectName: "playbackToggle"
+                    text: root.playbackPhase === "Playing" ? "Pause" : "Play"
+                    active: root.playbackPhase === "Playing"
                     bordered: true
                     focusable: true
-                    tooltipText: "Right-click the banner to play or pause"
-                    onClicked: root.runAction("toggle")
+                    tooltipText: "Right-click to play or pause"
+                    onClicked: root.togglePlayback()
                     MouseHint {
                         button: "right"
                         anchors.right: parent.right
@@ -303,10 +351,11 @@ BarWidget {
                     Layout.minimumWidth: playbackControls.buttonWidth
                     Layout.maximumWidth: playbackControls.buttonWidth
                     Layout.preferredHeight: Style.space(36)
+                    objectName: "nextTrack"
                     text: "Next"
                     bordered: true
                     focusable: true
-                    tooltipText: "Middle-click the banner for the next track"
+                    tooltipText: "Middle-click for the next track"
                     onClicked: root.runAction("skip")
                     MouseHint {
                         button: "middle"
@@ -315,15 +364,6 @@ BarWidget {
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
-            }
-            Text {
-                width: parent.width
-                text: "Right-click: Play | Pause\nMiddle-click: Next · Scroll: volume"
-                textFormat: Text.PlainText
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
-                font.family: Style.font.family
-                font.pixelSize: Style.font.caption
-                lineHeight: 1.4
             }
         }
     }

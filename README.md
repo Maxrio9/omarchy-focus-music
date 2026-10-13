@@ -9,7 +9,7 @@ Instrumental background music, one click from your desktop bar. Pick a genre, se
 - Five instrumental genres, each with more than 24 hours of catalogued music.
 - Shuffled queues. Choosing a genre starts another unplayed track instead of resuming.
 - A fixed-width artist/track banner that scrolls continuously in one direction, pausing at the beginning.
-- A themed hover popup with a genre dropdown, equally sized Previous, Play/Pause, and Next buttons with mouse-button hints, an instant volume readout beside the title, and mouse-control guide. Left-click pins it open.
+- A themed hover popup with a genre dropdown, equally sized Previous, Play/Pause, and Next buttons with mouse-button hints, an instant volume readout beside the title, and mouse icons. Left-click pins it open.
 - Background audio through mpv, streamed from YouTube without opening a browser.
 - Background track loudness leveling with peak-safe fixed gain, preserving the dynamics inside each piece.
 - No audio files bundled or permanently downloaded.
@@ -21,6 +21,8 @@ Instrumental background music, one click from your desktop bar. Pick a genre, se
 | Right-click | Pause / resume |
 | Middle-click | Next track |
 | Mouse wheel | Adjust music volume by 5% |
+
+Right-click, middle-click, and scrolling also work anywhere over the open popup. The Play/Pause label changes immediately and then reconciles with the player.
 
 Music starts at 20% player volume and remembers volume changes. It does not change your system volume.
 

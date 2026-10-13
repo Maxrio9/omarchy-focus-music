@@ -3,10 +3,12 @@ import qs.Commons
 
 Item {
     property string button: "right"
-    width: Style.space(15)
+    width: Style.space(button === "scroll" ? 28 : 15)
     height: Style.space(21)
     Rectangle {
-        anchors.fill: parent
+        width: Style.space(15)
+        height: parent.height
+        anchors.left: parent.left
         radius: width / 2
         color: "transparent"
         border.width: Style.space(1)
@@ -23,12 +25,21 @@ Item {
         color: Color.foreground
     }
     Rectangle {
-        anchors.horizontalCenter: parent.horizontalCenter
+        x: Style.space(6)
         y: Style.space(3)
         width: Style.space(3)
         height: Style.space(6)
         radius: Style.space(1)
         color: Color.foreground
-        opacity: button === "middle" ? 1 : 0.35
+        opacity: button === "middle" || button === "scroll" ? 1 : 0.35
+    }
+    Text {
+        visible: button === "scroll"
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        text: "↕"
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
     }
 }

@@ -172,6 +172,18 @@ class PlayerTests(unittest.TestCase):
         self.assertIn(['seek', expected, 'absolute+exact'], self.commands)
         self.assertNotIn(['playlist-prev', 'force'], self.commands)
 
+    def test_explicit_pause_is_idempotent_and_returns_confirmed_phase(self):
+        import contextlib
+        import io
+        self.player.play('piano')
+        for requested, expected in [('1', 'Paused'), ('1', 'Paused'), ('0', 'Playing')]:
+            output = io.StringIO()
+            with patch.object(self.player.sys, 'argv', ['focus-music', 'pause-set', requested]):
+                with contextlib.redirect_stdout(output):
+                    self.player.main()
+            self.assertEqual(json.loads(output.getvalue())['phase'], expected)
+            self.assertEqual(self.props['pause'], requested == '1')
+
     def test_status_reports_actual_track_and_artist(self):
         self.player.play('piano')
         current = self.player.state()['active_order'][0]
