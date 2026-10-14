@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Stream numeric spectrum data; never capture the microphone or mixed output."""
+import array
+import importlib.machinery
+import importlib.util
+import json
+import os
+from pathlib import Path
+import selectors
+import shutil
+import signal
+import socket
+import struct
+import subprocess
+import sys
+import time
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / 'lib'))
+from focus_spectrum import SIZE, RATE, spectrum, player_node
+
+
+def main():
+    if not all(shutil.which(tool) for tool in ('pw-cat', 'pw-dump')):
+        print(json.dumps({'bands': [0] * 5, 'state': 'unavailable'}), flush=True)
+        return
+    loader = importlib.machinery.SourceFileLoader('visualizer_player', str(ROOT / 'bin/focus-music'))
+    player = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(player)
+    with socket.socket(socket.AF_UNIX) as ipc:
+        ipc.connect(str(player.SOCKET))
+        pid = struct.unpack('3i', ipc.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[0]
+    objects = json.loads(subprocess.check_output(['pw-dump'], timeout=5))
+    target = player_node(objects, pid)
+    if target is None:
+        print(json.dumps({'bands': [0] * 5, 'state': 'unavailable'}), flush=True)
+        return
+    capture = subprocess.Popen(['pw-cat', '--record', '--raw', '--format', 'f32',
+                                '--rate', str(RATE), '--channels', '1', '--latency', '50ms',
+                                '--target', str(target), '-'], stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL)
+    def terminate(*args):
+        raise SystemExit
+    signal.signal(signal.SIGTERM, terminate)
+    signal.signal(signal.SIGINT, terminate)
+    buffer = b''
+    volume = 100
+    checked = 0
+    selector = selectors.DefaultSelector()
+    selector.register(capture.stdout, selectors.EVENT_READ)
+    try:
+        while capture.poll() is None:
+            if time.monotonic() - checked > 0.25:
+                checked = time.monotonic()
+                volume = player.prop('volume')
+            if not selector.select(1):
+                print(json.dumps({'bands': [0] * 5, 'state': 'waiting'}), flush=True)
+                continue
+            data = os.read(capture.stdout.fileno(), SIZE * 4)
+            if not data:
+                break
+            buffer += data
+            while len(buffer) >= SIZE * 4:
+                samples = array.array('f')
+                samples.frombytes(buffer[:SIZE * 4])
+                buffer = buffer[SIZE * 4:]
+                if sys.byteorder != 'little':
+                    samples.byteswap()
+                print(json.dumps({'bands': spectrum(samples, volume), 'state': 'active'}), flush=True)
+    finally:
+        selector.close()
+        capture.terminate()
+        try:
+            capture.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            capture.kill()
+            capture.wait()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+        print(json.dumps({'bands': [0] * 5, 'state': 'unavailable'}), flush=True)

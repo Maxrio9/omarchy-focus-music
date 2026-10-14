@@ -21,6 +21,7 @@ def load_player(directory, config=None):
         'FOCUS_MUSIC_STATE': str(directory / 'state.json'),
         'FOCUS_MUSIC_CONFIG': str(config or ROOT / 'data/sources.json'),
         'FOCUS_MUSIC_LOCAL_CONFIG': str(directory / 'local-sources.json'),
+        'FOCUS_MUSIC_PREFERENCES': str(directory / 'preferences.json'),
     }
     with patch.dict(os.environ, environment):
         loader = importlib.machinery.SourceFileLoader('focus_music_test', str(ROOT / 'bin/focus-music'))
@@ -66,14 +67,15 @@ class DeploymentTests(unittest.TestCase):
             (install / 'bin').mkdir(parents=True)
             (install / 'data').mkdir()
             (install / 'lib').mkdir()
-            (install / 'lib/focus_library.py').write_bytes((ROOT / 'lib/focus_library.py').read_bytes())
+            for name in ('focus_library.py', 'focus_preferences.py'):
+                (install / 'lib' / name).write_bytes((ROOT / 'lib' / name).read_bytes())
             (install / 'bin/focus-music').write_bytes((ROOT / 'bin/focus-music').read_bytes())
             (install / 'data/sources.json').write_bytes((ROOT / 'data/sources.json').read_bytes())
             home = root / 'New user home ü'
             home.mkdir()
             environment = dict(os.environ)
             for key in ('FOCUS_MUSIC_CONFIG', 'FOCUS_MUSIC_RUNTIME', 'FOCUS_MUSIC_STATE',
-                        'XDG_CONFIG_HOME', 'XDG_STATE_HOME', 'FOCUS_MUSIC_LOCAL_CONFIG'):
+                        'XDG_CONFIG_HOME', 'XDG_STATE_HOME', 'FOCUS_MUSIC_LOCAL_CONFIG', 'FOCUS_MUSIC_PREFERENCES'):
                 environment.pop(key, None)
             environment.update(HOME=str(home), XDG_RUNTIME_DIR=str(root / 'runtime'),
                                PYTHONDONTWRITEBYTECODE='1')

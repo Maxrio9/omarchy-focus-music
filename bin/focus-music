@@ -15,10 +15,12 @@ import time
 PACKAGE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PACKAGE / 'lib'))
 from focus_library import index_library, local_path
+import focus_preferences
 
 CONFIG_HOME = Path(os.environ.get('XDG_CONFIG_HOME') or str(Path.home() / '.config')) / 'focus-music'
 USER_CONFIG = CONFIG_HOME / 'sources.json'
 LOCAL_CONFIG = Path(os.environ.get('FOCUS_MUSIC_LOCAL_CONFIG') or str(CONFIG_HOME / 'local-sources.json'))
+PREFERENCES = Path(os.environ.get('FOCUS_MUSIC_PREFERENCES') or str(CONFIG_HOME / 'preferences.json'))
 CONFIG = Path(os.environ.get('FOCUS_MUSIC_CONFIG') or str(USER_CONFIG if USER_CONFIG.exists() else PACKAGE / 'data/sources.json'))
 RUNTIME = Path(os.environ.get('FOCUS_MUSIC_RUNTIME') or str(Path(os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}') / 'focus-music'))
 RUNTIME.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -31,6 +33,36 @@ SOURCES = json.loads(SOURCE_DATA)
 if LOCAL_DATA:
     SOURCES.update(json.loads(LOCAL_DATA)['genres'])
 CATALOG_REVISION = hashlib.sha256(SOURCE_DATA + b'\0' + LOCAL_DATA).hexdigest()
+
+
+def preferences():
+    plugin_id = json.loads((PACKAGE / 'manifest.json').read_text())['id'] if (PACKAGE / 'manifest.json').exists() else 'maxrio9.focus-music'
+    return focus_preferences.read(PREFERENCES, CONFIG_HOME.parent / 'omarchy/shell.json', plugin_id)
+
+
+def configure(changes):
+    focus_preferences.validate(changes)
+    before = preferences()
+    PREFERENCES.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (RUNTIME / 'preferences.lock').open('w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        updated = dict(preferences(), **changes)
+        if changes.get('placement') == 'right':
+            updated['barDisplay'] = 'icon'
+        temporary = PREFERENCES.with_suffix('.' + str(os.getpid()) + '.tmp')
+        temporary.write_text(json.dumps(updated))
+        temporary.chmod(0o600)
+        temporary.replace(PREFERENCES)
+    if 'placement' in changes and changes['placement'] != before['placement']:
+        if changes['placement'] == 'right':
+            subprocess.run([sys.executable, str(PACKAGE / 'scripts/configure-bar.py'), '--disable'], check=True)
+        elif before['placement'] == 'right':
+            subprocess.run([sys.executable, str(PACKAGE / 'scripts/configure-bar.py'), '--restore'], check=True)
+        plugin_id = json.loads((PACKAGE / 'manifest.json').read_text())['id']
+        placement = ['--section', 'right', '--index', '0'] if changes['placement'] == 'right' else [
+            '--section', 'center', '--before' if changes['placement'] == 'left' else '--after', 'omarchy.clock']
+        subprocess.run(['omarchy', 'bar', 'move', plugin_id] + placement, check=True)
+    return updated
 
 
 def ipc_many(commands):
@@ -154,7 +186,7 @@ def status():
             'track_count': count, 'title': title, 'artist': artist,
             'track_id': track['id'], 'banner': banner, 'volume': volume,
             'generation': str(saved.get('generation', 0)), 'normalization': normalization,
-            'catalog_revision': CATALOG_REVISION,
+            'catalog_revision': CATALOG_REVISION, 'preferences': preferences(),
             'tooltip': f'Focus music · {phase}\n{banner}\n{source["label"]} · {count:,} tracks · {source["duration"]/3600:.1f} hours\n{volume}% volume\nRight-click: Play | Pause\nMiddle-click: Next · Scroll: volume',
             'class': phase.lower()}
 
@@ -245,8 +277,14 @@ def main():
         plugin_id = json.loads((PACKAGE / 'manifest.json').read_text())['id']
         os.execvp('omarchy-shell', ['omarchy-shell', 'shell', 'toggle', plugin_id])
     if action in ('--help', '-h', 'help'):
-        print('Usage: focus-music {menu|genres|play GENRE|toggle|previous|skip|stop|volume DELTA|status|local FOLDER|place left|place right|compact-bar}')
+        print('Usage: focus-music {menu|genres|play GENRE|toggle|previous|skip|stop|volume DELTA|status|local FOLDER|place left|place right|compact-bar|settings|settings-set JSON}')
         print('Play streamed or user-supplied local music. Local indexing requires ffprobe; streaming requires yt-dlp.')
+        return
+    if action == 'settings':
+        print(json.dumps(preferences()))
+        return
+    if action == 'settings-set':
+        print(json.dumps(configure(json.loads(sys.argv[2]))))
         return
     if action == 'place':
         side = sys.argv[2]

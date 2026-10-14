@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import QtQuick.Layouts
+import QtQuick.Controls as Controls
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
@@ -14,11 +15,48 @@ BarWidget {
     property bool popupPinned: false
     readonly property bool opened: popupOpen
     function open() { popupPinned = true; popupOpen = true }
-    function close() { popupOpen = false; popupPinned = false }
+    function close() { popupOpen = false; popupPinned = false; settingsOpen = false }
     function runAction(action, argument) {
         var command = ["python3", controllerPath, action]
         if (argument !== undefined) command.push(String(argument))
         Quickshell.execDetached(command)
+    }
+    property bool settingsOpen: false
+    onSettingsOpenChanged: popupScroll.contentY = 0
+    property var preferences: ({barDisplay: "banner", popupVisualizer: true, volumeReactive: true, bannerWidth: null, placement: "left"})
+    readonly property string displayMode: preferences.barDisplay || "banner"
+    readonly property int bannerWidth: preferences.bannerWidth || Number(root.setting("bannerWidth", 180)) || 180
+    property var spectrumBands: [0, 0, 0, 0, 0]
+    readonly property bool spectrumWanted: playbackPhase === "Playing" && (displayMode === "visualizer" || (popupOpen && preferences.popupVisualizer))
+    onSpectrumWantedChanged: {
+        spectrumProcess.running = spectrumWanted
+        if (!spectrumWanted) spectrumBands = [0, 0, 0, 0, 0]
+    }
+    function savePreference(key, value) {
+        var next = Object.assign({}, preferences)
+        next[key] = value
+        if (key === "placement" && value === "right") next.barDisplay = "icon"
+        preferences = next
+        preferenceGrace.restart()
+        var changes = {}; changes[key] = value
+        runAction("settings-set", JSON.stringify(changes))
+    }
+    Timer { id: preferenceGrace; interval: 1500 }
+    Process {
+        id: spectrumProcess
+        command: ["python3", decodeURIComponent(String(Qt.resolvedUrl("bin/focus-visualizer")).replace(/^file:\/\//, ""))]
+        stdout: SplitParser {
+            onRead: function(line) {
+                try { root.spectrumBands = JSON.parse(line).bands || [0, 0, 0, 0, 0] } catch (e) {}
+            }
+        }
+        onExited: root.spectrumBands = [0, 0, 0, 0, 0]
+    }
+    Timer {
+        interval: 3000
+        running: root.spectrumWanted
+        repeat: true
+        onTriggered: if (!spectrumProcess.running) spectrumProcess.running = true
     }
     property var player: ({text: "󰎈", phase: "Stopped", banner: "Focus music", tooltip: "Focus music — click to choose a genre"})
     property string playbackOverride: ""
@@ -60,6 +98,7 @@ BarWidget {
         }
     }
     onPlayerChanged: {
+        if (player.preferences && !preferenceGrace.running) preferences = player.preferences
         if (player.catalog_revision && player.catalog_revision !== catalogRevision) {
             catalogRevision = player.catalog_revision
             genresPending = true
@@ -127,7 +166,7 @@ BarWidget {
         bar: root.bar
         labelVisible: false
         hasVisualContent: true
-        fixedWidth: root.vertical ? Style.bar.statusSlot : Style.space(Math.max(80, Math.min(500, Number(root.setting("bannerWidth", 180)) || 180)))
+        fixedWidth: root.vertical || root.displayMode === "icon" ? Style.bar.statusSlot : Style.space(root.displayMode === "visualizer" ? 80 : Math.max(80, Math.min(500, root.bannerWidth)))
         tooltipText: ""
         onTooltipHoveredChanged: {
             if (tooltipHovered) { closeHover.stop(); root.popupOpen = true }
@@ -146,7 +185,8 @@ BarWidget {
         }
         OpticalGlyph {
             id: glyph
-            anchors.left: parent.left
+            anchors.left: root.displayMode === "icon" ? undefined : parent.left
+            anchors.horizontalCenter: root.displayMode === "icon" ? parent.horizontalCenter : undefined
             anchors.leftMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             width: Style.bar.iconCanvas
@@ -156,9 +196,24 @@ BarWidget {
             fontSize: Style.bar.iconFont
             color: button.foreground
         }
+        Spectrum {
+            objectName: "barSpectrum"
+            visible: !root.vertical && root.displayMode === "visualizer"
+            anchors.left: glyph.right
+            anchors.leftMargin: Style.space(7)
+            anchors.right: parent.right
+            anchors.rightMargin: Style.space(8)
+            anchors.verticalCenter: parent.verticalCenter
+            height: Style.space(19)
+            bands: root.spectrumBands
+            volume: root.displayedVolume
+            volumeReactive: root.preferences.volumeReactive
+            playing: root.playbackPhase === "Playing"
+            foreground: button.foreground
+        }
         Item {
             id: bannerViewport
-            visible: !root.vertical
+            visible: !root.vertical && root.displayMode === "banner"
             anchors.left: glyph.right
             anchors.leftMargin: Style.space(7)
             anchors.right: parent.right
@@ -245,7 +300,7 @@ BarWidget {
             anchors.fill: parent
             anchors.margins: -popup.padding
             z: 10
-            enabled: !genreSelect.popupOpen
+            enabled: !genreSelect.popupOpen && !root.settingsOpen
             acceptedButtons: Qt.RightButton | Qt.MiddleButton
             onClicked: function(mouse) {
                 if (mouse.button === Qt.RightButton) root.togglePlayback()
@@ -257,9 +312,18 @@ BarWidget {
                 event.accepted = true
             }
         }
+        Flickable {
+            id: popupScroll
+            anchors.fill: parent
+            contentWidth: width
+            contentHeight: controls.implicitHeight
+            clip: true
+            interactive: contentHeight > height
+            boundsBehavior: Flickable.StopAtBounds
+            Controls.ScrollBar.vertical: Controls.ScrollBar { policy: Controls.ScrollBar.AsNeeded }
         Column {
             id: controls
-            anchors.fill: parent
+            width: popupScroll.width
             spacing: Style.space(10)
             RowLayout {
                 width: parent.width
@@ -271,6 +335,14 @@ BarWidget {
                     font.family: Style.font.family
                     font.pixelSize: Style.font.subtitle
                     font.bold: true
+                }
+                Spectrum {
+                    objectName: "popupSpectrum"
+                    visible: root.preferences.popupVisualizer
+                    bands: root.spectrumBands
+                    volume: root.displayedVolume
+                    volumeReactive: root.preferences.volumeReactive
+                    playing: root.playbackPhase === "Playing"
                 }
                 MouseHint { button: "scroll" }
                 Rectangle {
@@ -290,6 +362,10 @@ BarWidget {
                     font.pixelSize: Style.font.caption
                 }
             }
+            Column {
+                visible: !root.settingsOpen
+                width: parent.width
+                spacing: Style.space(10)
             GenreSelector {
                 id: genreSelect
                 objectName: "genreSelector"
@@ -382,6 +458,76 @@ BarWidget {
                     }
                 }
             }
+            }
+            Column {
+                visible: root.settingsOpen
+                width: parent.width
+                spacing: Style.space(10)
+                GenreSelector {
+                    id: displaySelect
+                    objectName: "displaySetting"
+                    width: parent.width
+                    label: "Bar display"
+                    value: root.displayMode
+                    options: [{value:"banner", label:"Scrolling track banner"}, {value:"visualizer", label:"Five-bar visualizer"}, {value:"icon", label:"Compact music icon"}]
+                    onChanged: function(value) { root.savePreference("barDisplay", value) }
+                    onPopupOpenChanged: if (popupOpen) placementSelect.close()
+                }
+                GenreSelector {
+                    id: placementSelect
+                    objectName: "placementSetting"
+                    width: parent.width
+                    label: "Placement"
+                    value: root.preferences.placement
+                    options: [{value:"left", label:"Left of date and time"}, {value:"clock-right", label:"Right of date and time"}, {value:"right", label:"Right-hand icons"}]
+                    onChanged: function(value) { root.savePreference("placement", value) }
+                    onPopupOpenChanged: if (popupOpen) displaySelect.close()
+                }
+                Toggle {
+                    objectName: "popupVisualizerSetting"
+                    width: parent.width
+                    label: "Visualizer in popup"
+                    titleSize: Style.font.body
+                    checked: root.preferences.popupVisualizer
+                    onClicked: root.savePreference("popupVisualizer", !checked)
+                }
+                Toggle {
+                    objectName: "volumeReactiveSetting"
+                    width: parent.width
+                    label: "Visualizer follows volume"
+                    titleSize: Style.font.body
+                    checked: root.preferences.volumeReactive
+                    onClicked: root.savePreference("volumeReactive", !checked)
+                }
+                RowLayout {
+                    visible: root.displayMode === "banner"
+                    width: parent.width
+                    Button { text: "−"; focusable: true; bordered: true; onClicked: root.savePreference("bannerWidth", Math.max(80, root.bannerWidth - 20)) }
+                    Text {
+                        Layout.fillWidth: true
+                        text: "Banner width: " + root.bannerWidth
+                        color: Color.foreground
+                        font.family: Style.font.family
+                        font.pixelSize: Style.font.caption
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    Button { text: "+"; focusable: true; bordered: true; onClicked: root.savePreference("bannerWidth", Math.min(500, root.bannerWidth + 20)) }
+                }
+            }
+            Button {
+                objectName: "settingsButton"
+                width: parent.width
+                text: root.settingsOpen ? "Back to music" : "Settings"
+                iconText: root.settingsOpen ? "󰌍" : "󰒓"
+                focusable: true
+                onClicked: {
+                    genreSelect.close()
+                    displaySelect.close()
+                    placementSelect.close()
+                    root.settingsOpen = !root.settingsOpen
+                }
+            }
+        }
         }
     }
 

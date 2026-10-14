@@ -9,7 +9,7 @@ Instrumental background music, one click from your desktop bar. Pick a genre, se
 - Five instrumental genres, each with more than 24 hours of catalogued music.
 - Shuffled queues. Choosing a genre starts a random track instead of resuming.
 - A fixed-width artist/track banner that scrolls continuously in one direction, pausing at the beginning.
-- A themed hover popup with a genre dropdown.
+- A themed hover popup with a genre dropdown, a live five-band audio visualization, and a settings panel.
 - Background audio through mpv, streamed from YouTube or played from your own local genre folders.
 - Background track loudness leveling with peak-safe fixed gain, preserving the dynamics inside each piece.
 - No audio files bundled or permanently downloaded.
@@ -161,6 +161,30 @@ On the first listen, measurement streams the track once more for analysis. Music
 
 To disable measurement for a new player instance, set `FOCUS_MUSIC_NORMALIZE=0` before launching it. The visible volume percentage is your player-volume setting, separate from the per-track gain. Stop the independent player from the command line before starting a new instance if you need to change its environment.
 
+## Display settings and visualization
+
+Open the popup and choose **Settings** to change:
+
+- **Bar display:** scrolling artist/track banner, five-bar visualizer, or compact music icon.
+- **Placement:** left of the date/time, right of the date/time, or among the right-hand icons. Choosing the right-hand icons also selects the compact icon and disables the optional bar/workspace hiding previously added by Focus Music.
+- **Visualizer in popup:** show five bars between the Focus Music title and the volume indicator.
+- **Visualizer follows volume:** scale the bars as you change player volume. Turn it off to emphasize the musical spectrum independently of the volume setting. Muted or paused playback shows idle bars.
+- **Banner width:** adjust the scrolling banner from 80 to 500 logical units.
+
+![Focus Music display settings](docs/settings.png)
+
+Preferences are stored outside the plugin checkout in `${XDG_CONFIG_HOME:-~/.config}/focus-music/preferences.json`. Placement changes use Omarchy's standard bar commands; optional compact-mode cleanup only edits the known user-owned clones created for Focus Music and keeps backups. Returning to a center placement restores only compact hiding that this switch previously disabled. Your music continues playing when the bar moves. Moving the widget can close its popup; hover its new location to reopen it.
+
+The visualization analyzes five frequency ranges from mpv's own PipeWire output stream, not a microphone or your desktop's combined audio. Audio samples are processed in memory and are not saved. It does not alter the audio path, run another music stream, or affect the loudness normalizer. Capture runs only while the music is playing and the popup visualization or bar visualizer is visible. It requires `pw-cat` and `pw-dump`, which are part of the standard Omarchy PipeWire setup; without an eligible output stream the bars remain idle. Numerical FFT measurements drive the bars; they are not a random animation.
+
+The same settings can be changed from the controller:
+
+```bash
+~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music settings
+~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music settings-set '{"barDisplay":"visualizer"}'
+~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music settings-set '{"placement":"right"}'
+```
+
 ## Customize
 
 Set the banner width in Omarchy's logical size units:
@@ -186,7 +210,7 @@ The player also works from the command line on Linux desktops:
 ~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music stop
 ```
 
-For testing or separate player instances, override `FOCUS_MUSIC_CONFIG`, `FOCUS_MUSIC_LOCAL_CONFIG`, `FOCUS_MUSIC_STATE`, `FOCUS_MUSIC_RUNTIME`, and `FOCUS_MUSIC_CACHE`.
+For testing or separate player instances, override `FOCUS_MUSIC_CONFIG`, `FOCUS_MUSIC_LOCAL_CONFIG`, `FOCUS_MUSIC_PREFERENCES`, `FOCUS_MUSIC_STATE`, `FOCUS_MUSIC_RUNTIME`, and `FOCUS_MUSIC_CACHE`.
 
 ## Update or remove
 
