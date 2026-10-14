@@ -6,7 +6,7 @@ Item {
     property string button: "right"
     Accessible.name: button === "scroll" ? "Scroll to adjust volume" : (button === "middle" ? "Middle-click for next track" : "Right-click to play or pause")
     implicitWidth: Style.space(button === "scroll" ? 28 : 15)
-    implicitHeight: Style.space(21)
+    implicitHeight: Style.space(button === "scroll" ? 23 : 21)
     width: implicitWidth
     height: implicitHeight
     Rectangle {
@@ -73,7 +73,7 @@ Item {
         onPaint: {
             var ctx = getContext("2d")
             ctx.reset()
-            ctx.scale(width / 34, height / 26)
+            ctx.scale(width / 34, height / 28)
             ctx.strokeStyle = ink
             ctx.lineWidth = 1.2
             ctx.lineCap = "round"
@@ -104,10 +104,10 @@ Item {
             ctx.moveTo(17, 1)
             ctx.lineTo(17, 5)
             ctx.moveTo(17, 21)
-            ctx.lineTo(17, 24)
-            ctx.moveTo(14.5, 21.5)
-            ctx.lineTo(17, 24)
-            ctx.lineTo(19.5, 21.5)
+            ctx.lineTo(17, 27)
+            ctx.moveTo(14.5, 24.5)
+            ctx.lineTo(17, 27)
+            ctx.lineTo(19.5, 24.5)
             ctx.stroke()
         }
     }
