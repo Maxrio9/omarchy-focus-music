@@ -2,110 +2,78 @@
 
 **Minimal widget for playing instrumental music. No login required!**
 
-Pick a genre, settle into your work, and keep playback a hover away. Stream instrumental playlists or play your own local music.
+Choose a genre and settle into your work. Focus Music streams gentle instrumental playlists or plays your own local music, with controls a hover away.
 
-![Focus Music bar and genre selector](preview.png)
+![Focus Music popup and genre selector](preview.png)
 
 ## Features
 
-- Five instrumental genres, each with more than 24 hours of catalogued music.
-- Shuffled queues. Choosing a genre starts a random track instead of resuming.
-- A fixed-width artist/track banner that scrolls continuously in one direction, pausing at the beginning.
-- A themed hover popup with a genre dropdown, a live audio visualizer, and a settings panel.
-- Background audio through mpv, streamed from YouTube or played from your own local genre folders.
-- Background track loudness leveling with peak-safe fixed gain, preserving the dynamics inside each piece.
-- No audio files bundled or permanently downloaded.
-
-| Gesture on the banner | Action |
-| --- | --- |
-| Hover | Show the genre and playback popup |
-| Left-click | Pin / unpin the popup |
-| Right-click | Pause / resume |
-| Middle-click | Next track |
-| Mouse wheel | Adjust music volume by 5% |
-
-Right-click, middle-click, and scrolling also work anywhere over the open popup. The Play/Pause label changes immediately and then reconciles with the player.
-
-Music starts at 20% player volume and remembers volume changes. It does not change your system volume.
-
-Open Focus Music from its bar widget. Installation does not add an entry to the Super + Space menu. If you previously added a custom shortcut, remove the `"focus-music"` entry from `~/.config/omarchy/extensions/omarchy-menu.jsonc`; the bar widget and playback keep working.
+- Shuffled instrumental music: lo-fi hip-hop, jazz, classical piano, orchestra, and gentle anime music.
+- A scrolling **Banner**, live **Visualizer**, or compact **Note** in your bar.
+- A themed popup with a genre selector, Previous / Play / Pause / Next controls, and settings.
+- Keyboard media keys and your choice of behavior when other media plays: pause and resume, lower the volume slightly or substantially, or keep playing.
+- Background loudness leveling that balances recordings while preserving their musical dynamics.
+- Local folders for offline playback. No audio files are bundled or downloaded for you.
+- A lightweight Rust backend. No account, subscription, or compiler needed.
 
 ## Install
 
-Requires **Omarchy 4's Quickshell bar** with the `qs.Commons` and `qs.Ui` components (`PopupCard`, `Dropdown`, and the bar buttons), **mpv 0.38+**, and a Linux x86-64 or ARM64 desktop. Portable Rust binaries are bundled; installation does not require a compiler or a Python runtime for the plugin. Streaming requires a recent yt-dlp; local indexing and loudness measurement require FFmpeg. Tested on Omarchy 4.0.4 with mpv 0.41. Other Omarchy versions must provide the same shell UI API. A plain Hyprland installation or a Waybar-based Omarchy bar can use the command-line player; the QML widget requires the Omarchy shell. `notify-send` is optional and provides error notifications.
-
-Install any missing dependencies:
+Requires Omarchy 4's Quickshell bar, Linux x86-64 or ARM64, and mpv 0.38+. Streaming uses yt-dlp; local indexing and loudness leveling use FFmpeg.
 
 ```bash
 omarchy pkg add mpv yt-dlp ffmpeg libnotify
-```
-
-Then install and enable the plugin:
-
-```bash
 omarchy plugin add https://github.com/Maxrio9/omarchy-focus-music --enable
 ```
 
-Place it left of the date and time:
+Hover over the widget to open it; left-click pins it open. Hold and drag to move it using Omarchy's bar controls.
 
-```bash
-omarchy bar move maxrio9.focus-music --section center --before omarchy.clock
-```
+| Mouse control | Action |
+| --- | --- |
+| Right-click | Play / pause |
+| Middle-click | Next track |
+| Scroll | Adjust music volume |
 
-Alternatively right of the date and time:
+These controls also work over the open music pane. Volume is remembered and affects only Focus Music.
 
-```bash
-omarchy bar move maxrio9.focus-music --section center --after omarchy.clock
-```
+## Display settings and visualization
 
-The plugin also provides `focus-music place left` and `focus-music place right` through its controller:
+Open **Settings** in the popup to choose Banner, Visualizer, or Note; adjust the banner or visualizer width; and choose what happens when other media plays.
 
-```bash
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music place right
-```
+The visualizer responds to the music and its volume. When it is already shown in the bar, it is hidden in the popup. Media keys follow the other player while it is playing; manually paused music stays paused.
 
-For narrow or portrait screens, optional compact mode hides the right-side icons while the center widgets or music banner are revealed. They return when the pointer leaves the bar; approaching the icons directly keeps them available. This creates a user-owned clone of the standard Omarchy bar, preserving system files:
-
-```bash
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music compact-bar
-```
-
-Restore the standard bar with `omarchy bar use omarchy.bar`. Compact mode supports Omarchy 4's standard bar and leaves a different custom bar unchanged.
-
-If your shell retains an older widget after an update, run `omarchy restart shell`. Playback runs separately from the shell.
+![Focus Music settings](docs/settings.png)
 
 ## Catalog
 
-| Genre | Tracks | Catalogued playback |
+| Genre | Tracks | Playback |
 | --- | ---: | ---: |
 | Lo-fi hip-hop | 4,339 | 178.3 hours |
 | Lo-fi jazz / jazzhop | 886 | 37.8 hours |
 | Calm café jazz | 677 | 30.7 hours |
 | Gentle classical piano | 477 | 35.3 hours |
 | Gentle orchestra & chamber music | 728 | 55.8 hours |
+| Gentle anime piano & orchestra | 514 | 24.1 hours |
 
-Sources include [Lofi Girl](https://www.youtube.com/@LofiGirl), [Chillhop Music](https://www.youtube.com/@ChillhopMusic), [Cafe Music BGM channel](https://www.youtube.com/@cafemusicbgmchannel), and [HALIDONMUSIC](https://www.youtube.com/@HALIDONMUSIC). Original collection URLs are in [data/collections.json](data/collections.json). For classical music, the banner credits the composer where performer information is unavailable.
+Sources include [Lofi Girl](https://www.youtube.com/@LofiGirl), [Chillhop Music](https://www.youtube.com/@ChillhopMusic), [Cafe Music BGM channel](https://www.youtube.com/@cafemusicbgmchannel), and [HALIDONMUSIC](https://www.youtube.com/@HALIDONMUSIC). Anime selections include [PianoDeuss](https://www.youtube.com/@PianoDeuss), [Torby Brand](https://www.youtube.com/@TorbyBrand), [kno](https://www.youtube.com/@knoMusic), and playlists curated by [Celestial Aeon Project](https://www.youtube.com/@CelestialAeonProject). Collection links are in [data/collections.json](data/collections.json).
 
-The catalog contains URLs, credits, durations and start/end boundaries. Those boundaries turn long mixes into individual skippable tracks. Online playback streams audio into mpv's memory buffer and requires an internet connection.
+Choosing a genre starts a random track instead of resuming. Tracks shuffle without repeating until the queue has been traversed; skipped tracks count as played. Online music streams from YouTube and requires an internet connection. Source availability can change.
 
-Duplicate metadata IDs and identical URL/start/end segments are removed across all five genres. This is a metadata audit, not audio fingerprinting: differently named uploads or different performances of the same composition may overlap. Catalogued hours describe the source listings; unavailable or removed videos can reduce playable hours. Queues repeat after all queued entries have been traversed, and skipped tracks count as traversed.
+Duplicate uploads and exact source segments are checked, but this is not audio fingerprinting. Different arrangements of the same composition can appear, and Ghibli pieces also remain in the classical genres.
 
 ## Add your own music
 
 ### Local folders and offline playback
 
-Supply your own music files and organize them into genre subfolders. You must obtain or download the files yourself; the plugin does not download music for offline use.
+Obtain your own music files and organize them into genre subfolders:
 
 ```text
 Focus/
 ├── Piano/
 │   ├── Artist - Track.flac
 │   └── Another track.mp3
-├── Jazz/
-│   └── Album/
-│       └── Track.ogg
-└── Lo-fi hip-hop/
-    └── Track.m4a
+└── Jazz/
+    └── Album/
+        └── Track.ogg
 ```
 
 Point the player at the parent folder:
@@ -114,23 +82,17 @@ Point the player at the parent folder:
 ~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music local "$HOME/Music/Focus"
 ```
 
-Each immediate subfolder becomes a **Local · Genre** entry in the dropdown, alongside the online genres. Nested album folders are scanned too. The dropdown refreshes automatically. Tracks use embedded artist/title tags, or `Artist - Track` filenames when tags are absent. Common formats include MP3, FLAC, M4A, Ogg, Opus, and WAV; FFmpeg supplies the duration and tag reader.
+Each immediate subfolder becomes a **Local · Genre** entry beside the online genres. Nested album folders are included. Artist/title tags are preferred, with filenames used as a fallback. MP3, FLAC, M4A, Ogg, Opus, and WAV are supported.
 
-Choose a local genre in the popup, or use its identifier from the import command:
+Local tracks work offline with shuffle, playback controls, visualization, and loudness leveling. The plugin does not download music for offline use.
 
-```bash
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music play local-piano
-```
+Run the same command again after changing the files. It updates the index without moving your music and reports unreadable files. One parent library is indexed at a time. To remove its entries, stop local playback and delete `${XDG_CONFIG_HOME:-~/.config}/focus-music/local-sources.json`.
 
-Local genres play directly from those files without an internet connection or yt-dlp. Shuffle, Previous/Next, volume, the track banner, and loudness leveling work for local files too. Local playback requires mpv; indexing and loudness leveling require FFmpeg. The bundled 24-hour totals apply to the online catalog; local totals reflect the files you supply.
+### Custom online catalogue
 
-Run the `local` command again after adding, removing, or changing files. It replaces the local index without moving or changing the music, and reports files it could not read. The index stays in `${XDG_CONFIG_HOME:-~/.config}/focus-music/local-sources.json`; it is not stored in the plugin repository. One parent library is indexed at a time. To remove local entries, stop local playback and remove that index file. The dropdown then refreshes automatically.
+Copy [data/sources.json](data/sources.json) to `${XDG_CONFIG_HOME:-~/.config}/focus-music/sources.json` and edit your copy. It replaces the bundled online catalogue, so copy first to keep the existing genres. Local folders remain separate.
 
-### Custom online catalogs for people or agents
-
-To add your own online tracks, copy `data/sources.json` to `${XDG_CONFIG_HOME:-~/.config}/focus-music/sources.json` and edit that copy. A custom catalog replaces the bundled online catalog, so copying first preserves the existing genres. Local folder genres are added separately. The popup refreshes when the catalog changes.
-
-A person or agent can add a genre or append tracks using this structure:
+Add a genre or append tracks using this structure:
 
 ```json
 {
@@ -153,74 +115,9 @@ A person or agent can add a genre or append tracks using this structure:
 }
 ```
 
-Use a unique ID for every track and real artist/title credits. Each track's `duration` must equal `end - start`; each genre's `duration` must equal the sum of its tracks. Start/end boundaries can select an individual piece within a longer mix. Change `catalog_version` when changing track membership or order so old queue indices cannot point at the wrong track. Keep the JSON valid, avoid duplicate IDs or identical URL/start/end segments, and choose instrumental tracks if you want to maintain the plugin's focus-music selection. User catalogs and local indexes belong in the user configuration directory, outside a Git checkout.
+Use unique track IDs and accurate credits. `start` / `end` select a piece within a longer recording; each track's `duration` must equal `end - start`, and the genre duration must be the sum of its tracks. Avoid duplicate entries and keep the JSON valid.
 
-## Loudness leveling
-
-The player measures each complete track in the background using FFmpeg's [EBU R128 scanner](https://ffmpeg.org/ffmpeg-filters.html#ebur128). It aims for −23 LUFS and calculates one gain adjustment for the whole piece, limited by a −2 dB true-peak ceiling and a maximum 12 dB boost. It does not compress the recording or continuously boost quiet passages. Quiet introductions and climaxes retain their contrast. A recording with unusually large dynamics may stay below the average target because peak headroom takes priority.
-
-On the first listen, measurement streams the track once more for analysis. Music keeps playing while it runs; the measured gain is introduced with a three-second transition and then held steady. The next two queued tracks are checked ahead of playback. Local files are measured directly without streaming. Only numeric loudness/peak measurements are cached under `${XDG_CACHE_HOME:-~/.cache}/focus-music/loudness/`, not audio or signed streaming URLs. This uses additional bandwidth when a track has not been measured before. If analysis fails, playback continues at its normal level.
-
-To disable measurement for a new player instance, set `FOCUS_MUSIC_NORMALIZE=0` before launching it. The visible volume percentage is your player-volume setting, separate from the per-track gain. Stop the independent player from the command line before starting a new instance if you need to change its environment.
-
-## Media keys and other media
-
-The standard Play/Pause, Next, and Previous keys control Focus Music through [MPRIS](https://specifications.freedesktop.org/mpris/latest/). When another MPRIS-compatible player starts playing, Focus Music yields the media keys to it, including when music continues in the background. It becomes available again when other media stops or pauses. Existing Omarchy keyboard bindings are preserved.
-
-The default **Pause and resume** setting pauses the music during other playback and resumes the same track afterwards. Music you manually paused stays paused. Volume reduction keeps your chosen volume intact and restores it afterwards; scrolling during reduced playback changes that chosen volume. Slight reduction uses 75% of the mpv volume setting and substantial reduction uses 40% (mpv's volume curve makes the audible reduction stronger). **No action** keeps playback and volume unchanged.
-
-Detection requires other applications to expose MPRIS playback status; silent applications or players without MPRIS cannot trigger this behavior. The native Rust bridge connects directly to the session D-Bus. It runs while the widget is enabled. Disabling the widget restores any automatic pause or volume reduction.
-
-## Display settings and visualization
-
-Open the popup and choose **Settings** to change:
-
-- **Bar display:** scrolling artist/track banner, Visualizer, or compact music icon.
-- **Width:** adjust the banner or Visualizer from 80 to 500 logical units. The wider the bar Visualizer, the more frequency bars it shows; the popup always keeps five bottom-anchored bars between the title and volume. A width of 120 gives six wider bars in the quickbar, with the same count while idle. Both respond to playback volume.
-- **When other media plays:** pause and resume to fill silence, lower volume greatly, lower volume slightly, or take no action.
-
-![Focus Music display settings](docs/settings.png)
-
-Hold and drag the widget to reposition it using Omarchy’s bar controls. Placement has no dropdown in Focus Music.
-
-Preferences are stored outside the plugin checkout in `${XDG_CONFIG_HOME:-~/.config}/focus-music/preferences.json`. Placement changes use Omarchy's standard bar commands; optional compact-mode cleanup only edits the known user-owned clones created for Focus Music and keeps backups. Returning to a center placement restores only compact hiding that this switch previously disabled. Your music continues playing when the bar moves. Moving the widget can close its popup; hover its new location to reopen it.
-
-The visualization analyzes frequency ranges from mpv's own PipeWire output stream, not a microphone or your desktop's combined audio. Audio samples are processed in memory and are not saved. It does not alter the audio path, run another music stream, or affect the loudness normalizer. Capture runs only while the music is playing and the popup visualization or bar visualizer is visible. It requires `pw-cat` and `pw-dump`, which are part of the standard Omarchy PipeWire setup; without an eligible output stream the bars remain idle. Numerical FFT measurements drive the bars; they are not a random animation.
-
-The same settings can be changed from the controller:
-
-```bash
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music settings
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music settings-set '{"barDisplay":"visualizer"}'
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music settings-set '{"placement":"right"}'
-```
-
-## Customize
-
-Set the banner width in Omarchy's logical size units:
-
-```bash
-omarchy bar set maxrio9.focus-music bannerWidth 180 --json
-```
-
-The default is 180, with a supported range of 80–500. The fixed width keeps neighboring widgets steady when the track changes. The preview above is captured from this same popup using a sample track; colors and corner shapes follow your Omarchy theme.
-
-The plugin uses its bundled catalog by default. Put a custom catalog at `${XDG_CONFIG_HOME:-~/.config}/focus-music/sources.json` to override it. Each genre has a `label`, `catalog_version`, total `duration`, and a `tracks` array; each track supplies a unique `id`, `artist`, `title`, `url`, `start`, `end`, and `duration`. Change `catalog_version` whenever you change the track ordering or membership.
-
-State is saved under `${XDG_STATE_HOME:-~/.local/state}/focus-music/`. The private mpv socket and playback log live under `$XDG_RUNTIME_DIR/focus-music/`.
-
-The player also works from the command line on Linux desktops:
-
-```bash
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music genres
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music play piano
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music toggle
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music previous
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music skip
-~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music stop
-```
-
-For testing or separate player instances, override `FOCUS_MUSIC_CONFIG`, `FOCUS_MUSIC_LOCAL_CONFIG`, `FOCUS_MUSIC_PREFERENCES`, `FOCUS_MUSIC_STATE`, `FOCUS_MUSIC_RUNTIME`, and `FOCUS_MUSIC_CACHE`.
+Change `catalog_version` whenever track membership or order changes, so saved queues cannot point at the wrong track. The genre selector refreshes automatically.
 
 ## Update or remove
 
@@ -228,44 +125,17 @@ For testing or separate player instances, override `FOCUS_MUSIC_CONFIG`, `FOCUS_
 omarchy plugin update maxrio9.focus-music
 ```
 
-Before removing the plugin, stop its independent audio player:
+Updating from 1.x? See the [migration notes](docs/upgrading.md).
+
+Stop the independent player before removing the plugin:
 
 ```bash
 ~/.config/omarchy/plugins/maxrio9.focus-music/bin/focus-music stop
 omarchy plugin remove maxrio9.focus-music
 ```
 
-Saved volume and queue state remain in your user state directory.
+## Credits
 
-## Development
+Plugin code is [MIT licensed](LICENSE). Music belongs to its artists and rights holders; this repository contains metadata and player code, not recordings. Support the artists through the source links.
 
-The controller, MPRIS bridge, visualizer, local-library indexer, loudness helper, and maintenance tools are written in Rust. QML remains the Omarchy frontend, and the small Lua hook forwards mpv events to the native helper. Offline tests check catalog durations and duplicate entries, shuffle consumption, segment boundaries, portable paths, clean installs with spaces and Unicode, unset/empty/custom XDG directories, track credits, mpv's JSON IPC framing, local folder/tag indexing, offline loudness measurement, both clock placements, the compact-bar patch, and track-wide normalization. Waveform tests verify that differently mastered levels converge while quiet/loud contrast stays intact.
-
-```bash
-cargo test --locked
-cargo clippy --locked --all-targets -- -D warnings
-scripts/audit-catalog
-omarchy plugin validate .
-```
-
-For a playback smoke test, point `FOCUS_MUSIC_RUNTIME` and `FOCUS_MUSIC_STATE` at temporary paths and set the player volume to zero before playing. QML uses Omarchy's `qs.Commons` and `qs.Ui` modules, so test it in the Omarchy shell.
-
-## License and music credits
-
-Plugin code is [MIT licensed](LICENSE). The music belongs to its respective artists and rights holders. This repository distributes source metadata and player code, not audio recordings. Support the artists and channels through the source links.
-
-## Build from source
-
-The bundled binaries support `x86_64` and `aarch64` Linux and use a static musl build. Their checksums are in `libexec/SHA256SUMS`; all backend source is under `src/`. For development, install Rust with rustup, then run:
-
-```bash
-scripts/build-native x86_64-unknown-linux-musl aarch64-unknown-linux-musl
-```
-
-The repository pins the compiler in `rust-toolchain.toml`. The build script strips contributor paths from binaries. Normal installation uses the bundled binary for your CPU; it does not download a toolchain or change shell configuration. `FOCUS_MUSIC_BINARY` can point at a development build, and `FOCUS_MUSIC_PACKAGE` can select its package directory.
-
-The player keeps the same configuration, state and loudness-cache locations as earlier versions. If upgrading a running pre-2.0 player, run the controller's `restart-player` command once: it replaces mpv's old helper hook while preserving the indexed queue, current position, pause state, volume and generation. This briefly restarts playback. Restart the shell afterwards to load the new frontend commands.
-
-## Performance
-
-The native visualizer shares one FFT between the bar and popup, and the widget receives status from the native media bridge rather than repeatedly starting the controller. See the [measured performance review](docs/performance.md) for CPU/RAM samples, their limits, and the native backend comparison.
+For technical details, see the [performance measurements](docs/performance.md) and [source build instructions](docs/building.md).

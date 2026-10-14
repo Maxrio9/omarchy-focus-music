@@ -15,7 +15,14 @@ BarWidget {
     property bool popupPinned: false
     readonly property bool opened: popupOpen
     function open() { popupPinned = true; popupOpen = true }
-    function close() { popupOpen = false; popupPinned = false; settingsOpen = false }
+    function close() {
+        genreSelect.close()
+        displaySelect.close()
+        otherMediaSelect.close()
+        popupOpen = false
+        popupPinned = false
+        settingsOpen = false
+    }
     function runAction(action, argument) {
         var command = [controllerPath, action]
         if (argument !== undefined) command.push(String(argument))
@@ -319,6 +326,7 @@ BarWidget {
     }
     PopupCard {
         id: popup
+        objectName: "musicPopup"
         anchorItem: button
         bar: root.bar
         owner: root
@@ -329,7 +337,9 @@ BarWidget {
             else closeHover.restart()
         }
         contentWidth: popup.fittedContentWidth(Style.space(380))
-        contentHeight: popup.fittedContentHeight(controls.implicitHeight)
+        // Resizing an open Wayland popup can briefly expose its transparent
+        // surface. Keep the surface stable; long content scrolls inside it.
+        contentHeight: popup.fittedContentHeight(Style.space(320))
         MouseArea {
             objectName: "popupInput"
             // Include card padding, while leaving left-click controls below it.
@@ -377,6 +387,7 @@ BarWidget {
                     implicitHeight: Style.space(24)
                     Spectrum {
                         objectName: "popupSpectrum"
+                        visible: root.displayMode !== "visualizer"
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.bottom: parent.bottom
                         width: Style.space(48)
@@ -406,12 +417,13 @@ BarWidget {
             }
             Column {
                 visible: !root.settingsOpen
+                z: genreSelect.popupOpen ? 20 : 0
                 width: parent.width
                 spacing: Style.space(10)
             GenreSelector {
                 id: genreSelect
                 objectName: "genreSelector"
-                maximumListHeight: Math.max(Style.space(32), Math.min(Style.space(200), popup.availableCardHeight - popup.verticalContentInset - Style.space(250)))
+                popupViewport: popupScroll
                 onPopupOpenChanged: if (!genreSelect.popupOpen) closeHover.restart()
                 width: parent.width
                 label: "Genre"
@@ -420,10 +432,13 @@ BarWidget {
                 onChanged: function(value) { root.runAction("play", value) }
             }
             Text {
+                objectName: "popupTrackTitle"
                 width: parent.width
                 text: root.player.phase === "Stopped" ? "Choose a genre to start" : (root.player.banner || "Loading…")
                 textFormat: Text.PlainText
                 wrapMode: Text.Wrap
+                maximumLineCount: 3
+                elide: Text.ElideRight
                 color: Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: Style.font.body
@@ -503,10 +518,12 @@ BarWidget {
             }
             Column {
                 visible: root.settingsOpen
+                z: displaySelect.popupOpen || otherMediaSelect.popupOpen ? 20 : 0
                 width: parent.width
                 spacing: Style.space(10)
                 GenreSelector {
                     id: displaySelect
+                    popupViewport: popupScroll
                     objectName: "displaySetting"
                     width: parent.width
                     label: "Bar display"
@@ -517,6 +534,7 @@ BarWidget {
                 }
                 GenreSelector {
                     id: otherMediaSelect
+                    popupViewport: popupScroll
                     objectName: "otherMediaSetting"
                     width: parent.width
                     label: "When other media plays"

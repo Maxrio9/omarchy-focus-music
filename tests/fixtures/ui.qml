@@ -43,6 +43,34 @@ ShellRoot {
   id:checks;when:false
   function check() {
    tryVerify(function(){return plugin.item.mediaStatusAt > 0 && plugin.item.player.phase === "Playing"},3000)
+   var popup=findChild(plugin.item,"musicPopup")
+   var surfaceHeight=popup.implicitHeight
+   var surfaceWidth=popup.implicitWidth
+   var savedPlayer=plugin.item.player
+   plugin.item.player=Object.assign({},savedPlayer,{banner:Array(100).fill("Long artist and track name").join(" ")})
+   wait(80)
+   compare(popup.implicitHeight,surfaceHeight)
+   compare(popup.implicitWidth,surfaceWidth)
+   verify(findChild(plugin.item,"popupTrackTitle").lineCount<=3)
+   plugin.item.player=savedPlayer
+   var genre=findChild(plugin.item,"genreSelector")
+   var selectorHeight=genre.implicitHeight
+   var savedOptions=genre.options
+   var manyOptions=[]
+   for(var n=0;n<40;n++)manyOptions.push({value:"piano",label:"Local piano collection "+n})
+   genre.options=manyOptions
+   genre.open()
+   wait(80)
+   compare(popup.implicitHeight,surfaceHeight)
+   compare(genre.implicitHeight,selectorHeight)
+   var list=findChild(genre,"genreList")
+   verify(list.contentHeight>list.height)
+   list.positionViewAtEnd()
+   wait(80)
+   verify(list.contentY>0)
+   verify(list.mapToItem(genre.popupViewport,0,list.height).y<=genre.popupViewport.height)
+   genre.close()
+   genre.options=savedOptions
    var previous=findChild(plugin.item,"previousTrack")
    var next=findChild(plugin.item,"nextTrack")
    var toggle=findChild(plugin.item,"playbackToggle")
@@ -63,15 +91,22 @@ ShellRoot {
    var gear=findChild(plugin.item,"settingsButton")
    mouseClick(gear,gear.width/2,gear.height/2)
    compare(plugin.item.settingsOpen,true)
+   compare(popup.implicitHeight,surfaceHeight)
    verify(findChild(plugin.item,"placementSetting")===null)
    var display=findChild(plugin.item,"displaySetting")
    compare(display.options[0].label,"Banner")
    compare(display.options[2].label,"Note")
    display.changed("visualizer")
+   compare(findChild(plugin.item,"popupSpectrum").visible,false)
+   display.open()
+   wait(80)
+   compare(popup.implicitHeight,surfaceHeight)
+   display.close()
    plugin.item.savePreference("visualizerWidth",120)
    compare(findChild(plugin.item,"barSpectrum").barCount,6)
    compare(findChild(plugin.item,"popupSpectrum").barCount,5)
    display.changed("icon")
+   compare(findChild(plugin.item,"popupSpectrum").visible,true)
    tryVerify(function(){return plugin.item.player.preferences.barDisplay==="icon" && plugin.item.player.preferences.visualizerWidth===120},4000)
    console.log("PASS native UI")
    Qt.quit()

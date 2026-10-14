@@ -20,8 +20,8 @@ fn catalog_is_complete_and_unique() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let catalog =
         Catalog::load(&root.join("data/sources.json"), &root.join("data/missing")).unwrap();
-    assert_eq!(catalog.genres.len(), 5);
-    assert_eq!(catalog.audit().unwrap().len(), 6);
+    assert_eq!(catalog.genres.len(), 6);
+    assert_eq!(catalog.audit().unwrap().len(), 7);
     let mut names = std::collections::HashSet::new();
     for (_, genre) in &catalog.genres {
         for track in &genre.tracks {
@@ -496,4 +496,26 @@ fn persistent_backend_reaps_finished_detached_children() {
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
     assert!(!path.exists(), "Finished helper was not reaped");
+}
+
+#[test]
+fn anime_catalog_excludes_looped_tails_and_keeps_artist_credits() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let catalog =
+        Catalog::load(&root.join("data/sources.json"), &root.join("data/missing")).unwrap();
+    let genre = catalog.get("anime").unwrap();
+    assert!(genre.duration >= 86400.);
+    let mut seen = std::collections::HashSet::new();
+    for track in &genre.tracks {
+        assert!(!track.artist.is_empty());
+        assert!(seen.insert((&track.url, track.start.to_bits(), track.end.to_bits())));
+        assert!(!track.title.to_lowercase().contains("2nd round"));
+        if track.url.ends_with("7bP5YwhH9tE") {
+            assert!(track.end <= 3820.);
+        }
+        if track.url.ends_with("cXjDu_1g7Co") {
+            assert!(track.end <= 2571.);
+        }
+        assert!(track.duration <= 1500.);
+    }
 }

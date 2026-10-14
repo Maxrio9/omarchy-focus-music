@@ -1,10 +1,10 @@
 {
   "hiphop": {
-    "title": "lofi hip hop playlist \ud83d\udcda beats to relax/study to",
+    "title": "lofi hip hop playlist 📚 beats to relax/study to",
     "url": "https://www.youtube.com/playlist?list=PLHD44KRu8Ods"
   },
   "jazzlofi": {
-    "title": "relaxing jazz playlist\ud83c\udf39 cozy music to study/chill to",
+    "title": "relaxing jazz playlist🌹 cozy music to study/chill to",
     "url": "https://www.youtube.com/playlist?list=PLHrcPWoDSB4c"
   },
   "cafewinter": {
@@ -24,11 +24,63 @@
     "url": "https://www.youtube.com/playlist?list=PLcGkkXtask_d2N0BP9VEuwDp40D8h_gBJ"
   },
   "chillhop-jazz": {
-    "title": "Chillhop Radio \ud83d\udc3e jazzy/lofi hip hop beats to study/relax to",
+    "title": "Chillhop Radio 🐾 jazzy/lofi hip hop beats to study/relax to",
     "url": "https://www.youtube.com/playlist?list=PLt7bG0K25iXj2h1eql20RZIPB_2CtK659"
   },
   "chillhop-albums": {
-    "title": "\ud83c\udfa7 Endless Chillhop \u2022 full releases",
+    "title": "🎧 Endless Chillhop • full releases",
     "url": "https://www.youtube.com/playlist?list=PLt7bG0K25iXgmw39iaVpZRszuwcsGNJFW"
+  },
+  "anime-deuss-1": {
+    "title": "The Most Beautiful & Relaxing Anime Piano Music (Part 1)",
+    "url": "https://www.youtube.com/watch?v=tvZgpXt-fZw"
+  },
+  "anime-deuss-2": {
+    "title": "The Most Beautiful & Relaxing Anime Piano Music (Part 2)",
+    "url": "https://www.youtube.com/watch?v=ZB9MX32ABeg"
+  },
+  "anime-deuss-3": {
+    "title": "The Most Beautiful & Relaxing Anime Piano Music (Part 3)",
+    "url": "https://www.youtube.com/watch?v=ZRBpVJD3Fy4"
+  },
+  "anime-deuss-4": {
+    "title": "The Most Beautiful & Relaxing Anime Piano Music (Part 4)",
+    "url": "https://www.youtube.com/watch?v=ctjzqCun8CE"
+  },
+  "anime-deuss-5": {
+    "title": "The Most Beautiful & Relaxing Anime Piano Music (Part 5)",
+    "url": "https://www.youtube.com/watch?v=xCi1VlQ0qfQ"
+  },
+  "anime-deuss-6": {
+    "title": "The Most Beautiful & Relaxing Anime Piano Music (Part 6)",
+    "url": "https://www.youtube.com/watch?v=BtiZgzr8n4Y"
+  },
+  "anime-deuss-7": {
+    "title": "The Most Beautiful & Relaxing Anime Piano Music (Part 7)",
+    "url": "https://www.youtube.com/watch?v=EiKYmpTZQoY"
+  },
+  "anime-torby": {
+    "title": "Anime Covers (Torby Brand)",
+    "url": "https://www.youtube.com/playlist?list=PLkIEo_0apwfJO7lGtncfibXngOOjEIaoo"
+  },
+  "anime-ghibli-instrumental": {
+    "title": "Ghibli Relax and Sleep",
+    "url": "https://www.youtube.com/playlist?list=PLh7uOKiV7sqbeaHqEpHvV_YRKW8sfwDr1"
+  },
+  "anime-sleep-instrumental": {
+    "title": "Relaxing Anime Instrumental Covers for Sleep",
+    "url": "https://www.youtube.com/playlist?list=PLh7uOKiV7sqYSDqeGqXFFAGDQxfuMVFLZ"
+  },
+  "anime-naruto-sleep": {
+    "title": "Naruto Sleep playlist",
+    "url": "https://www.youtube.com/playlist?list=PLh7uOKiV7sqZaL5klbSNvk4KpLP_FiDjS"
+  },
+  "anime-kno-day": {
+    "title": "Studio Ghibli Relaxing Piano Collection Daytime (first cycle)",
+    "url": "https://www.youtube.com/watch?v=cXjDu_1g7Co"
+  },
+  "anime-kno-night": {
+    "title": "Ghibli Calm Night Piano Music Collection (first cycle)",
+    "url": "https://www.youtube.com/watch?v=7bP5YwhH9tE"
   }
 }

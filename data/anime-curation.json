@@ -1,0 +1,13 @@
+{
+  "genre": "anime",
+  "selection": "Gentle instrumental anime and Ghibli arrangements: timestamped relaxing PianoDeuss collections, Torby Brand piano/strings covers, kno piano first cycles, and anime-related tracks from Celestial Aeon Project's instrumental sleep collections.",
+  "excluded": "Vocal/guest vocal, English/band/accompaniment covers, explicitly epic/battle/hard arrangements, unrelated tracks, repeated URLs, repeated performer/title identities, and looped tails.",
+  "loop_cutoffs": {
+    "https://www.youtube.com/watch?v=7bP5YwhH9tE": 3820,
+    "https://www.youtube.com/watch?v=cXjDu_1g7Co": 2571
+  },
+  "cutoff_note": "The nighttime mix repeats from 1:03:40. The daytime mix's last chapter includes its repeated tail, so that chapter is excluded rather than guessing its endpoint.",
+  "duplicates": "URL/start/end identities and normalized performer/title identities are deduplicated within this genre. Existing classical genres remain unchanged. Different performers' interpretations of a composition may occur; recordings have not been audio-fingerprinted.",
+  "tracks": 514,
+  "duration_seconds": 86837
+}

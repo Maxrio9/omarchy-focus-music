@@ -44,7 +44,7 @@ fn cli_and_user_storage_work_from_paths_with_spaces_and_unicode() {
     }
     let output = command(root.path(), &["music", "genres"]);
     let genres: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(genres.as_array().unwrap().len(), 5);
+    assert_eq!(genres.as_array().unwrap().len(), 6);
     assert_eq!(genres[0]["value"], "lofi-hiphop");
     let output = command(root.path(), &["music", "status"]);
     let status: Value = serde_json::from_slice(&output.stdout).unwrap();
