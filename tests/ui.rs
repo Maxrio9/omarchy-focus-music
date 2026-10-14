@@ -54,5 +54,6 @@ fn unchanged_ui_controls_native_backend() {
     assert_eq!(f.controller.state()["volume"].as_f64(), Some(80.));
     assert_eq!(f.controller.preferences()["barDisplay"], "icon");
     assert_eq!(f.controller.preferences()["visualizerWidth"], 120);
+    assert_eq!(f.controller.preferences()["otherMedia"], "none");
     println!("Native UI control, label, volume coalescing, settings, and width checks passed");
 }

@@ -46,12 +46,13 @@ ShellRoot {
    var popup=findChild(plugin.item,"musicPopup")
    var surfaceHeight=popup.implicitHeight
    var surfaceWidth=popup.implicitWidth
+   verify(surfaceHeight<popup.fittedContentHeight(Style.space(320)))
    var savedPlayer=plugin.item.player
    plugin.item.player=Object.assign({},savedPlayer,{banner:Array(100).fill("Long artist and track name").join(" ")})
    wait(80)
    compare(popup.implicitHeight,surfaceHeight)
    compare(popup.implicitWidth,surfaceWidth)
-   verify(findChild(plugin.item,"popupTrackTitle").lineCount<=3)
+   verify(findChild(plugin.item,"popupTrackTitle").lineCount<=2)
    plugin.item.player=savedPlayer
    var genre=findChild(plugin.item,"genreSelector")
    var selectorHeight=genre.implicitHeight
@@ -88,6 +89,21 @@ ShellRoot {
    for(var i=0;i<11;i++)plugin.item.adjustVolume(5)
    compare(plugin.item.displayedVolume,80)
    tryVerify(function(){return plugin.item.player.volume===80 && plugin.item.displayedVolume===80},3000)
+   var genreClicks=0
+   genre.changed.connect(function(){genreClicks++})
+   genre.options=manyOptions
+   for(var last=38;last<40;last++) {
+    genre.open()
+    wait(50)
+    genre.listView.positionViewAtIndex(last,ListView.Contain)
+    wait(50)
+    var row=genre.listView.itemAtIndex(last)
+    verify(row!==null)
+    mouseClick(row,row.width/2,row.height/2)
+    tryVerify(function(){return genreClicks===last-37},1000)
+    compare(genre.popupOpen,false)
+   }
+   genre.options=savedOptions
    var gear=findChild(plugin.item,"settingsButton")
    mouseClick(gear,gear.width/2,gear.height/2)
    compare(plugin.item.settingsOpen,true)
@@ -108,6 +124,19 @@ ShellRoot {
    display.changed("icon")
    compare(findChild(plugin.item,"popupSpectrum").visible,true)
    tryVerify(function(){return plugin.item.player.preferences.barDisplay==="icon" && plugin.item.player.preferences.visualizerWidth===120},4000)
+   var media=findChild(plugin.item,"otherMediaSetting")
+   for(var last=2;last<4;last++) {
+    media.open()
+    wait(50)
+    media.listView.positionViewAtIndex(last,ListView.Contain)
+    wait(50)
+    var row=media.listView.itemAtIndex(last)
+    verify(row!==null)
+    mouseClick(row,row.width/2,row.height/2)
+    compare(media.popupOpen,false)
+    compare(plugin.item.preferences.otherMedia,media.options[last].value)
+   }
+   tryVerify(function(){return plugin.item.player.preferences.otherMedia==="none"},3000)
    console.log("PASS native UI")
    Qt.quit()
   }

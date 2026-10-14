@@ -13,17 +13,26 @@ Item {
     property bool popupOpen: false
     property real maximumListHeight: Style.space(200)
     property Item popupViewport: null
+    property Item popupLayer: null
+    readonly property alias listView: optionList
     property real listHeightLimit: maximumListHeight
     signal changed(string value)
     implicitHeight: selector.implicitHeight
     z: popupOpen ? 30 : 0
     function fitList() {
         var available = maximumListHeight
+        var above = false
         if (popupViewport) {
             var bottom = root.mapToItem(popupViewport, 0, selector.height + Style.spacing.labelGap).y
-            available = Math.min(available, popupViewport.height - bottom - Style.space(4))
+            var top = root.mapToItem(popupViewport, 0, trigger.y - Style.spacing.labelGap).y
+            var belowSpace = popupViewport.height - bottom - Style.space(4)
+            above = belowSpace < Math.min(maximumListHeight, optionList.contentHeight + optionPanel.contentTopInset + optionPanel.contentBottomInset) && top > belowSpace
+            available = Math.min(available, above ? top : belowSpace)
         }
         listHeightLimit = Math.max(Style.spacing.popupRowHeight, available)
+        var point = root.mapToItem(optionPanel.parent, 0, above ? trigger.y - Style.spacing.labelGap : selector.height + Style.spacing.labelGap)
+        optionPanel.x = point.x
+        optionPanel.y = point.y - (above ? optionPanel.height : 0)
     }
     function open() {
         fitList()
@@ -104,9 +113,12 @@ Item {
         }
     }
     BorderSurface {
+        id: optionPanel
+        // A list outside the selector's bounds must live in a full-sized
+        // input layer too, not only paint outside its short parent item.
+        parent: root.popupLayer || root
         visible: root.popupOpen
-        y: selector.height + Style.spacing.labelGap
-        width: parent.width
+        width: root.width
         height: Math.min(optionList.contentHeight + contentTopInset + contentBottomInset,
                          root.listHeightLimit)
         color: Color.popups.background

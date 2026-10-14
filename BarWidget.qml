@@ -339,7 +339,13 @@ BarWidget {
         contentWidth: popup.fittedContentWidth(Style.space(380))
         // Resizing an open Wayland popup can briefly expose its transparent
         // surface. Keep the surface stable; long content scrolls inside it.
-        contentHeight: popup.fittedContentHeight(Style.space(320))
+        contentHeight: popup.fittedContentHeight(controls.implicitHeight)
+        Item {
+            id: dropdownLayer
+            anchors.fill: parent
+            z: 20
+            clip: true
+        }
         MouseArea {
             objectName: "popupInput"
             // Include card padding, while leaving left-click controls below it.
@@ -364,7 +370,7 @@ BarWidget {
             contentWidth: width
             contentHeight: controls.implicitHeight
             clip: true
-            interactive: contentHeight > height
+            interactive: contentHeight > height && !genreSelect.popupOpen && !displaySelect.popupOpen && !otherMediaSelect.popupOpen
             boundsBehavior: Flickable.StopAtBounds
             Controls.ScrollBar.vertical: Controls.ScrollBar { policy: Controls.ScrollBar.AsNeeded }
         Column {
@@ -415,7 +421,11 @@ BarWidget {
                     font.pixelSize: Style.font.caption
                 }
             }
+            Item {
+                width: parent.width
+                height: Math.max(musicPage.implicitHeight, settingsPage.implicitHeight)
             Column {
+                id: musicPage
                 visible: !root.settingsOpen
                 z: genreSelect.popupOpen ? 20 : 0
                 width: parent.width
@@ -424,6 +434,7 @@ BarWidget {
                 id: genreSelect
                 objectName: "genreSelector"
                 popupViewport: popupScroll
+                popupLayer: dropdownLayer
                 onPopupOpenChanged: if (!genreSelect.popupOpen) closeHover.restart()
                 width: parent.width
                 label: "Genre"
@@ -432,22 +443,28 @@ BarWidget {
                 onChanged: function(value) { root.runAction("play", value) }
             }
             Text {
+                id: popupTitle
                 objectName: "popupTrackTitle"
                 width: parent.width
+                height: titleMetrics.height * 2
                 text: root.player.phase === "Stopped" ? "Choose a genre to start" : (root.player.banner || "Loading…")
                 textFormat: Text.PlainText
                 wrapMode: Text.Wrap
-                maximumLineCount: 3
+                maximumLineCount: 2
                 elide: Text.ElideRight
                 color: Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: Style.font.body
+                FontMetrics { id: titleMetrics; font: popupTitle.font }
             }
             RowLayout {
                 width: parent.width
                 spacing: Style.space(8)
                 Text {
+                    id: genreCount
                     Layout.fillWidth: true
+                    Layout.preferredHeight: countMetrics.height
+                    FontMetrics { id: countMetrics; font: genreCount.font }
                     text: {
                         for (var i = 0; i < root.genres.length; i++) {
                             var g = root.genres[i]
@@ -517,6 +534,7 @@ BarWidget {
             }
             }
             Column {
+                id: settingsPage
                 visible: root.settingsOpen
                 z: displaySelect.popupOpen || otherMediaSelect.popupOpen ? 20 : 0
                 width: parent.width
@@ -524,6 +542,7 @@ BarWidget {
                 GenreSelector {
                     id: displaySelect
                     popupViewport: popupScroll
+                    popupLayer: dropdownLayer
                     objectName: "displaySetting"
                     width: parent.width
                     label: "Bar display"
@@ -535,6 +554,7 @@ BarWidget {
                 GenreSelector {
                     id: otherMediaSelect
                     popupViewport: popupScroll
+                    popupLayer: dropdownLayer
                     objectName: "otherMediaSetting"
                     width: parent.width
                     label: "When other media plays"
@@ -571,6 +591,7 @@ BarWidget {
                     }
                     Button { text: "+"; focusable: true; bordered: true; onClicked: root.savePreference("bannerWidth", Math.min(500, root.bannerWidth + 20)) }
                 }
+            }
             }
             Button {
                 objectName: "settingsButton"
