@@ -20,9 +20,16 @@ Choose a genre and settle into your work. Focus Music streams gentle instrumenta
 
 Requires Omarchy 4's Quickshell bar, Linux x86-64 or ARM64, and mpv 0.38+. Streaming uses yt-dlp; local indexing and loudness leveling use FFmpeg.
 
+Install any missing dependencies:
+
 ```bash
 omarchy pkg add mpv yt-dlp ffmpeg libnotify
-omarchy plugin add https://github.com/Maxrio9/omarchy-focus-music --enable
+```
+
+Then install and enable the widget:
+
+```bash
+omarchy plugin add https://github.com/Maxrio9/omarchy-focus-music.git --enable
 ```
 
 Hover over the widget to open it; left-click pins it open. Hold and drag to move it using Omarchy's bar controls.

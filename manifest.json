@@ -5,7 +5,7 @@
   "version": "2.1.0",
   "author": "Maxrio9",
   "license": "MIT",
-  "description": "Instrumental focus music with shuffled playlists, a scrolling track banner, genre selector and mouse controls.",
+  "description": "Minimal widget for instrumental focus music. No login required!",
   "kinds": [
     "bar-widget"
   ],
