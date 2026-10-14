@@ -14,6 +14,7 @@ Item {
     property real maximumListHeight: Style.space(200)
     property Item popupViewport: null
     property Item popupLayer: null
+    property bool allowOpenAbove: true
     readonly property alias listView: optionList
     property real listHeightLimit: maximumListHeight
     signal changed(string value)
@@ -26,7 +27,7 @@ Item {
             var bottom = root.mapToItem(popupViewport, 0, selector.height + Style.spacing.labelGap).y
             var top = root.mapToItem(popupViewport, 0, trigger.y - Style.spacing.labelGap).y
             var belowSpace = popupViewport.height - bottom - Style.space(4)
-            above = belowSpace < Math.min(maximumListHeight, optionList.contentHeight + optionPanel.contentTopInset + optionPanel.contentBottomInset) && top > belowSpace
+            above = allowOpenAbove && belowSpace < Math.min(maximumListHeight, optionList.contentHeight + optionPanel.contentTopInset + optionPanel.contentBottomInset) && top > belowSpace
             available = Math.min(available, above ? top : belowSpace)
         }
         listHeightLimit = Math.max(Style.spacing.popupRowHeight, available)

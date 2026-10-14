@@ -553,6 +553,7 @@ BarWidget {
                 }
                 GenreSelector {
                     id: otherMediaSelect
+                    allowOpenAbove: false
                     popupViewport: popupScroll
                     popupLayer: dropdownLayer
                     objectName: "otherMediaSetting"

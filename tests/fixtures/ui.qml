@@ -128,6 +128,7 @@ ShellRoot {
    for(var last=2;last<4;last++) {
     media.open()
     wait(50)
+    verify(media.listView.mapToItem(media,0,0).y>=media.height)
     media.listView.positionViewAtIndex(last,ListView.Contain)
     wait(50)
     var row=media.listView.itemAtIndex(last)
