@@ -68,3 +68,23 @@ class OtherMediaTests(unittest.TestCase):
         self.player.configure({'otherMedia': 'none'})
         self.player.sync_other_media(True)
         self.assertEqual(self.props['volume'], 40)
+
+
+class TrackTransitionTests(unittest.TestCase):
+    def test_loading_track_keeps_its_metadata_and_pause_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            player = load_player(Path(directory))
+            source = player.SOURCES['lofi-hiphop']
+            player.save({'genre': 'lofi-hiphop', 'volume': 40,
+                         'active_order': [0, 1, 2], 'catalog_version': source['catalog_version']})
+            for idle, paused in ((False, False), (False, True), (True, False), (True, True)):
+                def prop(name):
+                    if name == 'playlist-pos':
+                        return 2
+                    if name == 'time-pos':
+                        raise RuntimeError('property unavailable')
+                    return None
+                with patch.object(player, 'ipc_many', return_value=iter([idle, paused, 40, source['tracks'][2]['url']])), patch.object(player, 'prop', side_effect=prop):
+                    status = player.status()
+                self.assertEqual(status['track_id'], source['tracks'][2]['id'])
+                self.assertEqual(status['phase'], 'Paused' if paused else 'Loading')

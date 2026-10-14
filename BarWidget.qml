@@ -27,12 +27,13 @@ BarWidget {
     readonly property string displayMode: preferences.barDisplay || "banner"
     readonly property int bannerWidth: preferences.bannerWidth || Number(root.setting("bannerWidth", 180)) || 180
     readonly property int visualizerWidth: preferences.visualizerWidth || 100
+    readonly property int visualizerBarCount: Math.max(5, Math.min(30, Math.floor((visualizerWidth - 16) / 16)))
     property var popupBands: [0, 0, 0, 0, 0]
     property var spectrumBands: [0, 0, 0, 0, 0]
-    readonly property bool spectrumWanted: playbackPhase === "Playing" && (displayMode === "visualizer" || popupOpen)
+    readonly property bool spectrumWanted: (playbackPhase === "Playing" || playbackPhase === "Loading") && (displayMode === "visualizer" || popupOpen)
     onSpectrumWantedChanged: {
         spectrumProcess.running = spectrumWanted
-        if (!spectrumWanted) spectrumBands = [0, 0, 0, 0, 0]
+        if (!spectrumWanted) { spectrumBands = []; popupBands = [0, 0, 0, 0, 0] }
     }
     function savePreference(key, value) {
         var next = Object.assign({}, preferences)
@@ -58,10 +59,10 @@ BarWidget {
                 try { var frame = JSON.parse(line); root.spectrumBands = frame.bands || [0, 0, 0, 0, 0]; root.popupBands = frame.popupBands || root.spectrumBands.slice(0, 5) } catch (e) {}
             }
         }
-        onExited: root.spectrumBands = [0, 0, 0, 0, 0]
+        onExited: { root.spectrumBands = []; root.popupBands = [0, 0, 0, 0, 0] }
     }
     Timer {
-        interval: 3000
+        interval: 750
         running: root.spectrumWanted
         repeat: true
         onTriggered: if (!spectrumProcess.running) spectrumProcess.running = true
@@ -71,7 +72,7 @@ BarWidget {
     property bool playbackPending: false
     readonly property string playbackPhase: playbackOverride || player.phase
     function togglePlayback() {
-        playbackOverride = playbackPhase === "Playing" ? "Paused" : "Playing"
+        playbackOverride = (playbackPhase === "Playing" || playbackPhase === "Loading") ? "Paused" : "Playing"
         playbackPending = true
         flushPlayback()
     }
@@ -214,6 +215,7 @@ BarWidget {
             anchors.rightMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             height: Style.space(19)
+            barCount: root.visualizerBarCount
             bands: root.spectrumBands
             volume: root.displayedVolume * Number(root.player.volume_factor === undefined ? 1 : root.player.volume_factor)
             playing: root.playbackPhase === "Playing"
@@ -345,11 +347,12 @@ BarWidget {
                 }
                 Item {
                     Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignBottom
                     implicitHeight: Style.space(24)
                     Spectrum {
                         objectName: "popupSpectrum"
-                        centered: true
-                        anchors.centerIn: parent
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
                         width: Style.space(48)
                         height: Style.space(24)
                         bands: root.popupBands
@@ -439,8 +442,8 @@ BarWidget {
                     Layout.maximumWidth: playbackControls.buttonWidth
                     Layout.preferredHeight: Style.space(36)
                     objectName: "playbackToggle"
-                    text: root.playbackPhase === "Playing" ? "Pause" : "Play"
-                    active: root.playbackPhase === "Playing"
+                    text: (root.playbackPhase === "Playing" || root.playbackPhase === "Loading") ? "Pause" : "Play"
+                    active: root.playbackPhase === "Playing" || root.playbackPhase === "Loading"
                     bordered: true
                     focusable: true
                     tooltipText: "Right-click to play or pause"

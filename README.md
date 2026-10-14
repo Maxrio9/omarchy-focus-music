@@ -177,7 +177,7 @@ Open the popup and choose **Settings** to change:
 
 - **Bar display:** scrolling artist/track banner, Visualizer, or compact music icon.
 - **Placement:** left of the date/time, right of the date/time, or among the right-hand icons. Choosing the right-hand icons also selects the compact icon and disables the optional bar/workspace hiding previously added by Focus Music.
-- **Width:** adjust the banner or Visualizer from 80 to 500 logical units. The wider the bar Visualizer, the more frequency bars it shows; the popup always keeps five bars centered between the title and volume. Both respond to playback volume.
+- **Width:** adjust the banner or Visualizer from 80 to 500 logical units. The wider the bar Visualizer, the more frequency bars it shows; the popup always keeps five bottom-anchored bars between the title and volume. A width of 120 gives six wider bars in the quickbar, with the same count while idle. Both respond to playback volume.
 - **When other media plays:** pause and resume to fill silence, lower volume greatly, lower volume slightly, or take no action.
 
 ![Focus Music display settings](docs/settings.png)

@@ -17,7 +17,7 @@ import time
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'lib'))
-from focus_spectrum import SIZE, RATE, spectrum, player_node
+from focus_spectrum import SIZE, RATE, spectrum, player_node, bar_count
 
 
 def main():
@@ -46,7 +46,10 @@ def main():
     buffer = b''
     volume = 100
     checked = 0
-    count = 10
+    count = bar_count(player.preferences()["visualizerWidth"])
+    node_checked = time.monotonic()
+    playlist_index = None
+    rebind_until = 0
     selector = selectors.DefaultSelector()
     selector.register(capture.stdout, selectors.EVENT_READ)
     try:
@@ -54,9 +57,24 @@ def main():
             if time.monotonic() - checked > 0.25:
                 checked = time.monotonic()
                 volume = player.prop('volume')
-                count = max(5, min(48, (player.preferences()['visualizerWidth'] - 16) // 8))
-            if not selector.select(1):
-                print(json.dumps({'bands': [0] * 5, 'state': 'waiting'}), flush=True)
+                count = bar_count(player.preferences()['visualizerWidth'])
+                current_index = player.prop('playlist-pos')
+                if current_index != playlist_index:
+                    playlist_index = current_index
+                    rebind_until = time.monotonic() + 2
+                if time.monotonic() < rebind_until:
+                    objects = json.loads(subprocess.check_output(['pw-dump'], timeout=5))
+                    node_checked = time.monotonic()
+                    if player_node(objects, pid) != target:
+                        return
+            if not selector.select(0.2):
+                buffer = b''
+                print(json.dumps({'bands': [0] * count, 'popupBands': [0] * 5, 'state': 'waiting'}), flush=True)
+                if time.monotonic() - node_checked > 1:
+                    node_checked = time.monotonic()
+                    objects = json.loads(subprocess.check_output(['pw-dump'], timeout=5))
+                    if player_node(objects, pid) != target:
+                        return
                 continue
             data = os.read(capture.stdout.fileno(), SIZE * 4)
             if not data:

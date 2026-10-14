@@ -114,6 +114,8 @@ class Bridge:
                         'xesam:title': GLib.Variant('s', self.current.get('title', 'Focus Music')),
                         'xesam:artist': GLib.Variant('as', [self.current.get('artist', '')])}
             phase = self.current.get('phase', 'Stopped')
+            if phase == 'Loading':
+                phase = 'Playing'
             values = {'PlaybackStatus': ('s', phase if phase in ('Playing', 'Paused') else 'Stopped'),
                       'Metadata': ('a{sv}', metadata), 'Volume': ('d', self.current.get('volume', 20) / 100),
                       'Position': ('x', 0), 'Rate': ('d', 1.0), 'MinimumRate': ('d', 1.0), 'MaximumRate': ('d', 1.0)}

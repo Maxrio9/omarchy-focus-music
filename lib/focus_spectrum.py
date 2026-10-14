@@ -8,6 +8,11 @@ BOUNDARIES = (40, 160, 500, 1600, 5000, 10000)
 WINDOW = [0.5 - 0.5 * math.cos(2 * math.pi * i / (SIZE - 1)) for i in range(SIZE)]
 
 
+def bar_count(width):
+    """Keep a broad 16-unit pitch, matching the bar's logical layout."""
+    return max(5, min(30, (width - 16) // 16))
+
+
 def spectrum(samples, volume=100, count=5):
     values = [complex(samples[i] * WINDOW[i]) for i in range(SIZE)]
     j = 0

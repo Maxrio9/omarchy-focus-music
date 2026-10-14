@@ -12,7 +12,7 @@ from unittest.mock import patch
 from test_focus_music import ROOT, load_player
 
 sys.path.insert(0, str(ROOT / 'lib'))
-from focus_spectrum import SIZE, RATE, spectrum, player_node
+from focus_spectrum import SIZE, RATE, spectrum, player_node, bar_count
 import focus_preferences
 
 
@@ -31,6 +31,15 @@ class SpectrumTests(unittest.TestCase):
         quiet = spectrum([value * 0.2 ** 3 for value in reference], 20)
         for a, b in zip(loud, quiet):
             self.assertAlmostEqual(a, b, places=5)
+
+    def test_wider_bar_pitch_and_idle_count(self):
+        self.assertEqual(bar_count(80), 5)
+        self.assertEqual(bar_count(120), 6)
+        self.assertEqual(bar_count(240), 14)
+        self.assertEqual(bar_count(500), 30)
+        for width in (80, 120, 240, 500):
+            count = bar_count(width)
+            self.assertEqual(spectrum([0] * SIZE, count=count), [0] * count)
 
     def test_variable_band_counts_preserve_frequency_response(self):
         samples = [0.15 * math.sin(2 * math.pi * 1000 * i / RATE) for i in range(SIZE)]

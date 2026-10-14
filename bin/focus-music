@@ -161,14 +161,25 @@ def status():
             ['get_property', 'volume'], ['get_property', 'path']]))
         volume = round(volume)
         phase = 'Stopped' if idle else ('Paused' if paused else 'Playing')
+        try:
+            playlist_index = prop('playlist-pos')
+            index = playlist_index or 0
+        except RuntimeError:
+            playlist_index = None
         if not idle:
+            # Position may be unavailable while the next file is loading.
+            # Read the playlist index first so the banner never jumps to track 1.
             try:
-                position, index = list(ipc_many([['get_property', 'time-pos'], ['get_property', 'playlist-pos']]))
-                position, index = position or 0, index or 0
+                position = prop('time-pos')
+                if position is None:
+                    phase = 'Paused' if paused else 'Loading'
+                    position = 0
             except RuntimeError:
-                phase = 'Loading'
+                phase = 'Paused' if paused else 'Loading'
+        elif playlist_index is not None and playlist_index >= 0:
+            phase = 'Paused' if paused else 'Loading'
         elif time.time() - saved.get('started', 0) < 60:
-            phase = 'Loading'
+            phase = 'Paused' if paused else 'Loading'
     except (OSError, RuntimeError, ValueError):
         pass
     normalization = {'state': 'off', 'gain_db': 0}
