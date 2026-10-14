@@ -1,0 +1,21 @@
+#!/bin/sh
+# Compare fresh source builds to the ORIGINAL committed release digests.
+set -eu
+focus_root=$(cd -- "$(dirname -- "$(readlink -f -- "$0")")/.." && pwd)
+focus_work=$(mktemp -d)
+trap 'rm -rf "$focus_work"' EXIT HUP INT TERM
+cp "$focus_root/libexec/SHA256SUMS" "$focus_work/expected-sha256sums"
+(
+  cd "$focus_root/libexec"
+  sha256sum -c "$focus_work/expected-sha256sums"
+)
+"$focus_root/scripts/build-native-reproducible" "$focus_work/rebuilt"
+(
+  cd "$focus_work/rebuilt"
+  sha256sum -c "$focus_work/expected-sha256sums"
+)
+for focus_arch in x86_64 aarch64; do
+  cmp "$focus_root/libexec/$focus_arch/focus-music" "$focus_work/rebuilt/$focus_arch/focus-music"
+done
+cmp "$focus_root/libexec/SHA256SUMS" "$focus_work/expected-sha256sums"
+echo 'Both bundled binaries match clean source builds byte-for-byte; originals were not overwritten.'

@@ -3,6 +3,8 @@ set -eu
 focus_root=$(cd -- "$(dirname -- "$(readlink -f -- "$0")")/.." && pwd)
 cd "$focus_root"
 focus_cargo_home=${CARGO_HOME:-${HOME}/.cargo}
+focus_output=${FOCUS_MUSIC_NATIVE_OUTPUT:-$focus_root/libexec}
+focus_target_dir=${CARGO_TARGET_DIR:-$focus_root/target}
 # Keep contributor paths out of published binaries and panic locations.
 export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=$focus_root=/src --remap-path-prefix=$focus_cargo_home=/cargo"
 if [ "$#" -eq 0 ]; then set -- x86_64-unknown-linux-musl; fi
@@ -12,15 +14,17 @@ for focus_target in "$@"; do
     aarch64-unknown-linux-musl) focus_arch=aarch64 ;;
     *) echo "Unsupported build target: $focus_target" >&2; exit 1 ;;
   esac
-  rustup target add "$focus_target"
+  if ! rustup target list --installed | grep -qx "$focus_target"; then
+    rustup target add "$focus_target"
+  fi
   cargo build --locked --release --target "$focus_target"
-  mkdir -p "libexec/$focus_arch"
-  cp "target/$focus_target/release/focus-music" "libexec/$focus_arch/focus-music"
-  chmod 755 "libexec/$focus_arch/focus-music"
+  mkdir -p "$focus_output/$focus_arch"
+  cp "$focus_target_dir/$focus_target/release/focus-music" "$focus_output/$focus_arch/focus-music"
+  chmod 755 "$focus_output/$focus_arch/focus-music"
 done
 (
-  cd libexec
+  cd "$focus_output"
   find . -mindepth 2 -maxdepth 2 -type f -name focus-music | LC_ALL=C sort | while IFS= read -r focus_file; do
     sha256sum "${focus_file#./}"
   done
-) > libexec/SHA256SUMS
+) > "$focus_output/SHA256SUMS"
