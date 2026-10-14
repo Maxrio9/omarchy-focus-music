@@ -5,7 +5,7 @@
   "version": "2.1.0",
   "author": "Maxrio9",
   "license": "MIT",
-  "description": "Minimal widget for instrumental focus music. No login required!",
+  "description": "Minimal widget for instrumental focus music. No login or music download required",
   "kinds": [
     "bar-widget"
   ],

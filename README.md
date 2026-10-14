@@ -1,6 +1,6 @@
 # Focus Music for Omarchy
 
-**Minimal widget for playing instrumental music. No login required!**
+**Minimal widget for playing instrumental music. No login or music download required**
 
 Choose a genre and settle into your work. Focus Music streams gentle instrumental playlists or plays your own local music, with controls a hover away.
 
