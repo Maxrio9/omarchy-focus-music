@@ -497,7 +497,7 @@ BarWidget {
                     width: parent.width
                     label: "Bar display"
                     value: root.displayMode
-                    options: [{value:"banner", label:"Banner"}, {value:"visualizer", label:"Visualizer"}, {value:"icon", label:"Compact music icon"}]
+                    options: [{value:"banner", label:"Banner"}, {value:"visualizer", label:"Visualizer"}, {value:"icon", label:"Note"}]
                     onChanged: function(value) { root.savePreference("barDisplay", value) }
                     onPopupOpenChanged: if (popupOpen) { placementSelect.close(); otherMediaSelect.close() }
                 }

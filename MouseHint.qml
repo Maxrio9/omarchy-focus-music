@@ -39,16 +39,18 @@ Item {
         visible: root.button !== "scroll"
         opacity: button === "middle" ? 1 : 0.35
     }
-    // A downward press mark belongs to the mouse; scrolling uses a separate
-    // outlined wheel flanked by arrows, without the mouse-body silhouette.
-    Text {
-        visible: root.button === "middle"
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: Style.space(9)
-        text: "⌄"
-        color: Color.foreground
-        font.family: Style.font.family
-        font.pixelSize: Style.font.caption
+    // Short radial marks indicate a wheel press; arrows are reserved for scroll.
+    Repeater {
+        model: root.button === "middle" ? 3 : 0
+        Rectangle {
+            required property int index
+            x: Style.space(index === 0 ? 3 : index === 1 ? 7 : 11)
+            y: Style.space(index === 1 ? 11 : 10)
+            width: Style.space(1)
+            height: Style.space(3)
+            rotation: index === 0 ? 35 : index === 2 ? -35 : 0
+            color: Color.foreground
+        }
     }
     Rectangle {
         visible: root.button === "scroll"
