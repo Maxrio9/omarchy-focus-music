@@ -23,11 +23,13 @@ BarWidget {
     }
     property bool settingsOpen: false
     onSettingsOpenChanged: popupScroll.contentY = 0
-    property var preferences: ({barDisplay: "banner", popupVisualizer: true, volumeReactive: true, bannerWidth: null, placement: "left"})
+    property var preferences: ({barDisplay: "banner", visualizerWidth: 100, otherMedia: "pause-resume", bannerWidth: null, placement: "left"})
     readonly property string displayMode: preferences.barDisplay || "banner"
     readonly property int bannerWidth: preferences.bannerWidth || Number(root.setting("bannerWidth", 180)) || 180
+    readonly property int visualizerWidth: preferences.visualizerWidth || 100
+    property var popupBands: [0, 0, 0, 0, 0]
     property var spectrumBands: [0, 0, 0, 0, 0]
-    readonly property bool spectrumWanted: playbackPhase === "Playing" && (displayMode === "visualizer" || (popupOpen && preferences.popupVisualizer))
+    readonly property bool spectrumWanted: playbackPhase === "Playing" && (displayMode === "visualizer" || popupOpen)
     onSpectrumWantedChanged: {
         spectrumProcess.running = spectrumWanted
         if (!spectrumWanted) spectrumBands = [0, 0, 0, 0, 0]
@@ -41,13 +43,19 @@ BarWidget {
         var changes = {}; changes[key] = value
         runAction("settings-set", JSON.stringify(changes))
     }
+    Process {
+        id: mediaBridge
+        command: ["/usr/bin/python3", decodeURIComponent(String(Qt.resolvedUrl("bin/focus-media")).replace(/^file:\/\//, ""))]
+        running: true
+    }
+    Timer { interval: 5000; running: true; repeat: true; onTriggered: if (!mediaBridge.running) mediaBridge.running = true }
     Timer { id: preferenceGrace; interval: 1500 }
     Process {
         id: spectrumProcess
         command: ["python3", decodeURIComponent(String(Qt.resolvedUrl("bin/focus-visualizer")).replace(/^file:\/\//, ""))]
         stdout: SplitParser {
             onRead: function(line) {
-                try { root.spectrumBands = JSON.parse(line).bands || [0, 0, 0, 0, 0] } catch (e) {}
+                try { var frame = JSON.parse(line); root.spectrumBands = frame.bands || [0, 0, 0, 0, 0]; root.popupBands = frame.popupBands || root.spectrumBands.slice(0, 5) } catch (e) {}
             }
         }
         onExited: root.spectrumBands = [0, 0, 0, 0, 0]
@@ -166,7 +174,7 @@ BarWidget {
         bar: root.bar
         labelVisible: false
         hasVisualContent: true
-        fixedWidth: root.vertical || root.displayMode === "icon" ? Style.bar.statusSlot : Style.space(root.displayMode === "visualizer" ? 80 : Math.max(80, Math.min(500, root.bannerWidth)))
+        fixedWidth: root.vertical || root.displayMode === "icon" ? Style.bar.statusSlot : Style.space(root.displayMode === "visualizer" ? root.visualizerWidth : Math.max(80, Math.min(500, root.bannerWidth)))
         tooltipText: ""
         onTooltipHoveredChanged: {
             if (tooltipHovered) { closeHover.stop(); root.popupOpen = true }
@@ -185,6 +193,7 @@ BarWidget {
         }
         OpticalGlyph {
             id: glyph
+            visible: root.displayMode !== "visualizer" || root.vertical
             anchors.left: root.displayMode === "icon" ? undefined : parent.left
             anchors.horizontalCenter: root.displayMode === "icon" ? parent.horizontalCenter : undefined
             anchors.leftMargin: Style.space(8)
@@ -199,15 +208,14 @@ BarWidget {
         Spectrum {
             objectName: "barSpectrum"
             visible: !root.vertical && root.displayMode === "visualizer"
-            anchors.left: glyph.right
-            anchors.leftMargin: Style.space(7)
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(8)
             anchors.right: parent.right
             anchors.rightMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             height: Style.space(19)
             bands: root.spectrumBands
-            volume: root.displayedVolume
-            volumeReactive: root.preferences.volumeReactive
+            volume: root.displayedVolume * Number(root.player.volume_factor === undefined ? 1 : root.player.volume_factor)
             playing: root.playbackPhase === "Playing"
             foreground: button.foreground
         }
@@ -329,20 +337,25 @@ BarWidget {
                 width: parent.width
                 spacing: Style.space(8)
                 Text {
-                    Layout.fillWidth: true
                     text: "Focus Music"
                     color: Color.foreground
                     font.family: Style.font.family
                     font.pixelSize: Style.font.subtitle
                     font.bold: true
                 }
-                Spectrum {
-                    objectName: "popupSpectrum"
-                    visible: root.preferences.popupVisualizer
-                    bands: root.spectrumBands
-                    volume: root.displayedVolume
-                    volumeReactive: root.preferences.volumeReactive
-                    playing: root.playbackPhase === "Playing"
+                Item {
+                    Layout.fillWidth: true
+                    implicitHeight: Style.space(24)
+                    Spectrum {
+                        objectName: "popupSpectrum"
+                        centered: true
+                        anchors.centerIn: parent
+                        width: Style.space(48)
+                        height: Style.space(24)
+                        bands: root.popupBands
+                        volume: root.displayedVolume * Number(root.player.volume_factor === undefined ? 1 : root.player.volume_factor)
+                        playing: root.playbackPhase === "Playing"
+                    }
                 }
                 MouseHint { button: "scroll" }
                 Rectangle {
@@ -469,9 +482,9 @@ BarWidget {
                     width: parent.width
                     label: "Bar display"
                     value: root.displayMode
-                    options: [{value:"banner", label:"Scrolling track banner"}, {value:"visualizer", label:"Five-bar visualizer"}, {value:"icon", label:"Compact music icon"}]
+                    options: [{value:"banner", label:"Scrolling track banner"}, {value:"visualizer", label:"Visualizer"}, {value:"icon", label:"Compact music icon"}]
                     onChanged: function(value) { root.savePreference("barDisplay", value) }
-                    onPopupOpenChanged: if (popupOpen) placementSelect.close()
+                    onPopupOpenChanged: if (popupOpen) { placementSelect.close(); otherMediaSelect.close() }
                 }
                 GenreSelector {
                     id: placementSelect
@@ -481,23 +494,31 @@ BarWidget {
                     value: root.preferences.placement
                     options: [{value:"left", label:"Left of date and time"}, {value:"clock-right", label:"Right of date and time"}, {value:"right", label:"Right-hand icons"}]
                     onChanged: function(value) { root.savePreference("placement", value) }
-                    onPopupOpenChanged: if (popupOpen) displaySelect.close()
+                    onPopupOpenChanged: if (popupOpen) { displaySelect.close(); otherMediaSelect.close() }
                 }
-                Toggle {
-                    objectName: "popupVisualizerSetting"
+                GenreSelector {
+                    id: otherMediaSelect
+                    objectName: "otherMediaSetting"
                     width: parent.width
-                    label: "Visualizer in popup"
-                    titleSize: Style.font.body
-                    checked: root.preferences.popupVisualizer
-                    onClicked: root.savePreference("popupVisualizer", !checked)
+                    label: "When other media plays"
+                    value: root.preferences.otherMedia || "pause-resume"
+                    options: [{value:"pause-resume", label:"Pause and resume · fill silence"}, {value:"duck-strong", label:"Lower volume greatly"}, {value:"duck-gentle", label:"Lower volume slightly"}, {value:"none", label:"No action"}]
+                    onChanged: function(value) { root.savePreference("otherMedia", value) }
+                    onPopupOpenChanged: if (popupOpen) { displaySelect.close(); placementSelect.close() }
                 }
-                Toggle {
-                    objectName: "volumeReactiveSetting"
+                RowLayout {
+                    visible: root.displayMode === "visualizer"
                     width: parent.width
-                    label: "Visualizer follows volume"
-                    titleSize: Style.font.body
-                    checked: root.preferences.volumeReactive
-                    onClicked: root.savePreference("volumeReactive", !checked)
+                    Button { text: "−"; focusable: true; bordered: true; onClicked: root.savePreference("visualizerWidth", Math.max(80, root.visualizerWidth - 20)) }
+                    Text {
+                        Layout.fillWidth: true
+                        text: "Visualizer width: " + root.visualizerWidth
+                        color: Color.foreground
+                        font.family: Style.font.family
+                        font.pixelSize: Style.font.caption
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    Button { text: "+"; focusable: true; bordered: true; onClicked: root.savePreference("visualizerWidth", Math.min(500, root.visualizerWidth + 20)) }
                 }
                 RowLayout {
                     visible: root.displayMode === "banner"
@@ -524,6 +545,7 @@ BarWidget {
                     genreSelect.close()
                     displaySelect.close()
                     placementSelect.close()
+                    otherMediaSelect.close()
                     root.settingsOpen = !root.settingsOpen
                 }
             }

@@ -134,7 +134,6 @@ def commit(saved):
     source = SOURCES[saved['genre']]
     order = saved.get('active_order', [])
     try:
-        saved['volume'] = prop('volume')
         if saved.get('catalog_version') != source['catalog_version'] or not order or prop('idle-active'):
             return
         index = prop('playlist-pos')
@@ -184,7 +183,8 @@ def status():
     return {'text': '󰎈' if phase == 'Stopped' else ('󰏤' if phase == 'Paused' else '󰎆'),
             'phase': phase, 'genre': saved['genre'], 'track': number + 1,
             'track_count': count, 'title': title, 'artist': artist,
-            'track_id': track['id'], 'banner': banner, 'volume': volume,
+            'track_id': track['id'], 'banner': banner, 'volume': round(saved.get('volume', 20)),
+            'effective_volume': volume, 'volume_factor': saved.get('volume_factor', 1),
             'generation': str(saved.get('generation', 0)), 'normalization': normalization,
             'catalog_revision': CATALOG_REVISION, 'preferences': preferences(),
             'tooltip': f'Focus music · {phase}\n{banner}\n{source["label"]} · {count:,} tracks · {source["duration"]/3600:.1f} hours\n{volume}% volume\nRight-click: Play | Pause\nMiddle-click: Next · Scroll: volume',
@@ -212,7 +212,7 @@ def ensure_player(saved, source):
             '--loop-playlist=inf', '--audio-display=no', '--ytdl-format=bestaudio/best',
             *(['--script-opts=ytdl_hook-ytdl_path=' + resolver] if resolver else []),
             '--script=' + str(PACKAGE / 'scripts/normalizer'),
-            f'--volume={saved.get("volume", 20)}',
+            f'--volume={saved.get("volume", 20) * saved.get("volume_factor", 1)}',
             f'--input-ipc-server={SOCKET}', '--title=Focus music'],
             stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
     for _ in range(50):
@@ -271,6 +271,34 @@ def wait_ready(generation):
     notify('Music is taking longer to load. Try skipping this track or choosing another genre.')
 
 
+def sync_other_media(active):
+    """Called with the control lock held; never resume a user's manual pause."""
+    saved = state()
+    mode = preferences()['otherMedia']
+    factor = {'duck-strong': 0.4, 'duck-gentle': 0.75}.get(mode, 1) if active else 1
+    changed = saved.get('volume_factor', 1) != factor
+    saved['volume_factor'] = factor
+    try:
+        paused = prop('pause')
+        if active and mode == 'pause-resume':
+            if not paused and not prop('idle-active'):
+                ipc(['set_property', 'pause', True])
+                saved['auto_paused'] = True
+                changed = True
+        elif saved.get('auto_paused'):
+            ipc(['set_property', 'pause', False])
+            saved['auto_paused'] = False
+            changed = True
+        if changed:
+            ipc(['set_property', 'volume', saved.get('volume', 20) * factor])
+    except (OSError, RuntimeError):
+        if saved.get('auto_paused'):
+            saved['auto_paused'] = False
+            changed = True
+    if changed:
+        save(saved)
+
+
 def main():
     action = sys.argv[1] if len(sys.argv) > 1 else 'menu'
     if action == 'menu':
@@ -325,7 +353,14 @@ def main():
     generation = None
     with (RUNTIME / 'control.lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        if action == 'play':
+        preserve_pause = len(sys.argv) > 2 and sys.argv[2] == 'keep-pause' and status()['phase'] == 'Paused'
+        if action in ('play', 'pause-set', 'toggle', 'skip', 'previous', 'stop'):
+            saved = state()
+            saved['auto_paused'] = False
+            save(saved)
+        if action == 'media-sync':
+            sync_other_media(bool(int(sys.argv[2])))
+        elif action == 'play':
             generation = play(sys.argv[2])
         elif action == 'pause-set':
             paused = bool(int(sys.argv[2]))
@@ -369,19 +404,18 @@ def main():
                 pass
         elif action in ('volume', 'volume-set'):
             saved = state()
-            try:
-                current = prop('volume')
-            except OSError:
-                current = saved.get('volume', 20)
+            current = saved.get('volume', 20)
             saved['volume'] = max(0, min(100, float(sys.argv[2]) if action == 'volume-set' else current + int(sys.argv[2])))
             save(saved)
             try:
-                ipc(['set_property', 'volume', saved['volume']])
+                ipc(['set_property', 'volume', saved['volume'] * saved.get('volume_factor', 1)])
             except OSError:
                 pass
             print(json.dumps({'volume': saved['volume']}))
         else:
             raise ValueError('Unknown action: ' + action)
+        if preserve_pause and action in ('skip', 'previous'):
+            ipc(['set_property', 'pause', True])
     if generation is not None:
         wait_ready(generation)
     if action == 'pause-set':

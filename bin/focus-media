@@ -1,0 +1,166 @@
+#!/usr/bin/python3
+"""MPRIS bridge. Yield the media keys while another MPRIS player is playing."""
+import fcntl
+import hashlib
+import importlib.machinery
+import importlib.util
+from pathlib import Path
+import signal
+import subprocess
+import sys
+
+try:
+    from gi.repository import Gio, GLib
+except ImportError:
+    print('Focus Music media integration requires python-gobject', file=sys.stderr)
+    sys.exit(0)
+
+ROOT = Path(__file__).resolve().parent.parent
+NAME = 'org.mpris.MediaPlayer2.focusmusic'
+PATH = '/org/mpris/MediaPlayer2'
+PLAYER = 'org.mpris.MediaPlayer2.Player'
+BASE = 'org.mpris.MediaPlayer2'
+PROPS = 'org.freedesktop.DBus.Properties'
+XML = '''<node><interface name="org.mpris.MediaPlayer2">
+<method name="Raise"/><method name="Quit"/>
+<property name="CanQuit" type="b" access="read"/><property name="CanRaise" type="b" access="read"/>
+<property name="HasTrackList" type="b" access="read"/><property name="Identity" type="s" access="read"/>
+<property name="DesktopEntry" type="s" access="read"/>
+<property name="SupportedUriSchemes" type="as" access="read"/><property name="SupportedMimeTypes" type="as" access="read"/>
+</interface><interface name="org.mpris.MediaPlayer2.Player">
+<method name="Next"/><method name="Previous"/><method name="Pause"/><method name="PlayPause"/><method name="Stop"/><method name="Play"/>
+<method name="Seek"><arg type="x" direction="in"/></method>
+<method name="SetPosition"><arg type="o" direction="in"/><arg type="x" direction="in"/></method>
+<method name="OpenUri"><arg type="s" direction="in"/></method>
+<property name="PlaybackStatus" type="s" access="read"/>
+<property name="Metadata" type="a{sv}" access="read"/>
+<property name="Volume" type="d" access="readwrite"/>
+<property name="Position" type="x" access="read"/>
+<property name="Rate" type="d" access="readwrite"/>
+<property name="MinimumRate" type="d" access="read"/><property name="MaximumRate" type="d" access="read"/>
+<property name="CanGoNext" type="b" access="read"/><property name="CanGoPrevious" type="b" access="read"/>
+<property name="CanPlay" type="b" access="read"/><property name="CanPause" type="b" access="read"/>
+<property name="CanSeek" type="b" access="read"/><property name="CanControl" type="b" access="read"/>
+</interface></node>'''
+
+
+class Bridge:
+    def __init__(self, player):
+        self.player = player
+        self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        self.owner = 0
+        self.current = {}
+        self.last = None
+        info = Gio.DBusNodeInfo.new_for_xml(XML)
+        for interface in info.interfaces:
+            self.bus.register_object(PATH, interface, self.method, self.get_property, self.set_property)
+        self.bus.signal_subscribe(None, PROPS, 'PropertiesChanged', PATH, None,
+                                  Gio.DBusSignalFlags.NONE, self.changed)
+        self.bus.signal_subscribe('org.freedesktop.DBus', 'org.freedesktop.DBus', 'NameOwnerChanged',
+                                  '/org/freedesktop/DBus', None, Gio.DBusSignalFlags.NONE, self.changed)
+
+    def call(self, name, path, interface, method, args=None):
+        return self.bus.call_sync(name, path, interface, method, args, None,
+                                  Gio.DBusCallFlags.NONE, 500, None).unpack()
+
+    def other_playing(self):
+        names = self.call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'ListNames')[0]
+        for name in names:
+            if not name.startswith('org.mpris.MediaPlayer2.') or name == NAME or 'playerctld' in name:
+                continue
+            try:
+                if self.call(name, PATH, PROPS, 'Get', GLib.Variant('(ss)', (PLAYER, 'PlaybackStatus')))[0] == 'Playing':
+                    return True
+            except GLib.Error:
+                pass
+        return False
+
+    def changed(self, connection, sender, path, interface, signal_name, params):
+        if sender != self.bus.get_unique_name():
+            GLib.idle_add(self.tick)
+
+    def tick(self):
+        try:
+            active = self.other_playing()
+            with (self.player.RUNTIME / 'control.lock').open('w') as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                self.player.sync_other_media(active)
+            self.current = self.player.status()
+            # Omarchy prefers the oldest playing source. Withdraw our control
+            # endpoint while other media plays, including in duck/no-action mode.
+            if active and self.owner:
+                Gio.bus_unown_name(self.owner)
+                self.owner = 0
+            elif not active and not self.owner:
+                self.owner = Gio.bus_own_name_on_connection(self.bus, NAME, Gio.BusNameOwnerFlags.NONE, None, None)
+            properties = {key: self.get_property(None, None, PATH, PLAYER, key)
+                          for key in ('PlaybackStatus', 'Metadata', 'Volume')}
+            if properties != self.last:
+                self.last = properties
+                self.bus.emit_signal(None, PATH, PROPS, 'PropertiesChanged',
+                                     GLib.Variant('(sa{sv}as)', (PLAYER, properties, [])))
+        except (OSError, RuntimeError, GLib.Error, ValueError):
+            pass
+        return False
+
+    def get_property(self, connection, sender, path, interface, name):
+        if interface == BASE:
+            values = {'CanQuit': ('b', False), 'CanRaise': ('b', False), 'HasTrackList': ('b', False),
+                      'Identity': ('s', 'Focus Music'), 'DesktopEntry': ('s', 'focusmusic'),
+                      'SupportedUriSchemes': ('as', []), 'SupportedMimeTypes': ('as', [])}
+        else:
+            track = hashlib.sha256(str(self.current.get('track_id', '')).encode()).hexdigest()
+            metadata = {'mpris:trackid': GLib.Variant('o', PATH + '/track/' + track),
+                        'xesam:title': GLib.Variant('s', self.current.get('title', 'Focus Music')),
+                        'xesam:artist': GLib.Variant('as', [self.current.get('artist', '')])}
+            phase = self.current.get('phase', 'Stopped')
+            values = {'PlaybackStatus': ('s', phase if phase in ('Playing', 'Paused') else 'Stopped'),
+                      'Metadata': ('a{sv}', metadata), 'Volume': ('d', self.current.get('volume', 20) / 100),
+                      'Position': ('x', 0), 'Rate': ('d', 1.0), 'MinimumRate': ('d', 1.0), 'MaximumRate': ('d', 1.0)}
+            values.update({key: ('b', key != 'CanSeek' and (key not in ('CanGoNext', 'CanGoPrevious') or phase in ('Playing', 'Paused'))) for key in
+                           ('CanGoNext', 'CanGoPrevious', 'CanPlay', 'CanPause', 'CanSeek', 'CanControl')})
+        return GLib.Variant(*values[name])
+
+    def run(self, *args):
+        return subprocess.Popen([sys.executable, str(ROOT / 'bin/focus-music'), *args],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def method(self, connection, sender, path, interface, method, args, invocation):
+        actions = {'Next': ('skip', 'keep-pause'), 'Previous': ('previous', 'keep-pause'), 'Pause': ('pause-set', '1'),
+                   'PlayPause': ('toggle',), 'Stop': ('stop',), 'Play': ('pause-set', '0')}
+        if method in actions:
+            self.run(*actions[method])
+        invocation.return_value(None)
+
+    def set_property(self, connection, sender, path, interface, name, value):
+        if name == 'Volume':
+            self.run('volume-set', str(max(0, min(100, value.unpack() * 100))))
+            return True
+        return name == 'Rate' and value.unpack() == 1
+
+
+def main():
+    loader = importlib.machinery.SourceFileLoader('media_player', str(ROOT / 'bin/focus-music'))
+    player = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(player)
+    with (player.RUNTIME / 'media.lock').open('w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return
+        bridge = Bridge(player)
+        loop = GLib.MainLoop()
+        def cleanup(*args):
+            with (player.RUNTIME / 'control.lock').open('w') as control:
+                fcntl.flock(control, fcntl.LOCK_EX)
+                player.sync_other_media(False)
+            loop.quit()
+        signal.signal(signal.SIGTERM, cleanup)
+        signal.signal(signal.SIGINT, cleanup)
+        bridge.tick()
+        GLib.timeout_add(500, lambda: (bridge.tick(), True)[1])
+        loop.run()
+
+
+if __name__ == '__main__':
+    main()

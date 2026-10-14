@@ -2,10 +2,11 @@
 import json
 from pathlib import Path
 
-DEFAULTS = {'barDisplay': 'banner', 'placement': 'left', 'popupVisualizer': True,
-            'volumeReactive': True, 'bannerWidth': None}
+DEFAULTS = {'barDisplay': 'banner', 'placement': 'left', 'bannerWidth': None,
+            'visualizerWidth': 100, 'otherMedia': 'pause-resume'}
 CHOICES = {'barDisplay': ('banner', 'visualizer', 'icon'),
-           'placement': ('left', 'clock-right', 'right')}
+           'placement': ('left', 'clock-right', 'right'),
+           'otherMedia': ('pause-resume', 'duck-strong', 'duck-gentle', 'none')}
 
 
 def validate(changes):
@@ -14,17 +15,22 @@ def validate(changes):
     for key, value in changes.items():
         if key in CHOICES and value not in CHOICES[key]:
             raise ValueError('Invalid ' + key)
-        if key in ('popupVisualizer', 'volumeReactive') and not isinstance(value, bool):
-            raise ValueError(key + ' must be true or false')
-        if key == 'bannerWidth' and value is not None and (type(value) is not int or not 80 <= value <= 500):
-            raise ValueError('Banner width must be between 80 and 500')
+        if key in ('bannerWidth', 'visualizerWidth') and value is not None and (type(value) is not int or not 80 <= value <= 500):
+            raise ValueError('Width must be between 80 and 500')
+        if key == 'visualizerWidth' and value is None:
+            raise ValueError('Visualizer width requires an integer')
     return changes
 
 
 def read(path, shell_path=None, plugin_id='maxrio9.focus-music'):
     settings = dict(DEFAULTS)
     try:
-        settings.update(validate(json.loads(path.read_text())))
+        saved = json.loads(path.read_text())
+        if not isinstance(saved, dict):
+            raise ValueError('Settings must be an object')
+        for deprecated in ('popupVisualizer', 'volumeReactive'):
+            saved.pop(deprecated, None)
+        settings.update(validate(saved))
         return settings
     except (OSError, ValueError):
         pass

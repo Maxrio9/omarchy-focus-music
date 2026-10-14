@@ -46,6 +46,7 @@ def main():
     buffer = b''
     volume = 100
     checked = 0
+    count = 10
     selector = selectors.DefaultSelector()
     selector.register(capture.stdout, selectors.EVENT_READ)
     try:
@@ -53,6 +54,7 @@ def main():
             if time.monotonic() - checked > 0.25:
                 checked = time.monotonic()
                 volume = player.prop('volume')
+                count = max(5, min(48, (player.preferences()['visualizerWidth'] - 16) // 8))
             if not selector.select(1):
                 print(json.dumps({'bands': [0] * 5, 'state': 'waiting'}), flush=True)
                 continue
@@ -66,7 +68,7 @@ def main():
                 buffer = buffer[SIZE * 4:]
                 if sys.byteorder != 'little':
                     samples.byteswap()
-                print(json.dumps({'bands': spectrum(samples, volume), 'state': 'active'}), flush=True)
+                print(json.dumps({'bands': spectrum(samples, volume, count), 'popupBands': spectrum(samples, volume), 'state': 'active'}), flush=True)
     finally:
         selector.close()
         capture.terminate()

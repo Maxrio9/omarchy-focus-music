@@ -32,6 +32,16 @@ class SpectrumTests(unittest.TestCase):
         for a, b in zip(loud, quiet):
             self.assertAlmostEqual(a, b, places=5)
 
+    def test_variable_band_counts_preserve_frequency_response(self):
+        samples = [0.15 * math.sin(2 * math.pi * 1000 * i / RATE) for i in range(SIZE)]
+        for count in (8, 20, 48):
+            values = spectrum(samples, count=count)
+            self.assertEqual(len(values), count)
+            self.assertGreater(max(values), 0.5)
+            frequency = 40 * 250 ** ((values.index(max(values)) + 0.5) / count)
+            self.assertLess(abs(frequency - 1000), 300)
+            self.assertEqual(spectrum([0] * SIZE, count=count), [0] * count)
+
     def test_selects_only_the_players_output_not_other_apps_or_microphone(self):
         objects = [
             {'id': 1, 'type': 'PipeWire:Interface:Client', 'info': {'props': {'application.process.id': 123}}},
@@ -48,19 +58,30 @@ class PreferencesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             player = load_player(Path(directory))
             with patch.object(player.subprocess, 'run') as commands:
-                updated = player.configure({'placement': 'right', 'volumeReactive': False})
+                updated = player.configure({'placement': 'right', 'otherMedia': 'duck-gentle'})
             self.assertEqual(updated['barDisplay'], 'icon')
-            self.assertFalse(updated['volumeReactive'])
+            self.assertEqual(updated['otherMedia'], 'duck-gentle')
             self.assertEqual(player.preferences(), updated)
             self.assertEqual(player.PREFERENCES.stat().st_mode & 0o777, 0o600)
             calls = [call.args[0] for call in commands.call_args_list]
             self.assertEqual(calls[0][-1], '--disable')
             self.assertEqual(calls[1][-4:], ['--section', 'right', '--index', '0'])
             before = player.PREFERENCES.read_bytes()
-            for invalid in ({'barDisplay': 'fake'}, {'volumeReactive': 'false'}, {'bannerWidth': 10000}, {'unknown': 1}):
+            for invalid in ({'barDisplay': 'fake'}, {'otherMedia': 'invalid'}, {'bannerWidth': 10000}, {'unknown': 1}):
                 with self.assertRaises(ValueError):
                     player.configure(invalid)
                 self.assertEqual(player.PREFERENCES.read_bytes(), before)
+
+    def test_deprecated_visualizer_preferences_do_not_reset_other_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'preferences.json'
+            path.write_text(json.dumps({'popupVisualizer': False, 'volumeReactive': False,
+                                        'barDisplay': 'visualizer', 'bannerWidth': 240}))
+            prefs = focus_preferences.read(path)
+            self.assertEqual(prefs['barDisplay'], 'visualizer')
+            self.assertEqual(prefs['bannerWidth'], 240)
+            self.assertNotIn('popupVisualizer', prefs)
+            self.assertEqual(prefs['visualizerWidth'], 100)
 
     def test_infers_existing_manual_bar_position_before_preferences_exist(self):
         with tempfile.TemporaryDirectory() as directory:
