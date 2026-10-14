@@ -13,7 +13,7 @@ def bar_count(width):
     return max(5, min(30, (width - 16) // 16))
 
 
-def spectrum(samples, volume=100, count=5):
+def spectra(samples, volume=100, counts=(5,)):
     values = [complex(samples[i] * WINDOW[i]) for i in range(SIZE)]
     j = 0
     for i in range(1, SIZE):
@@ -39,15 +39,23 @@ def spectrum(samples, volume=100, count=5):
     # mpv's software volume uses cubic scaling. Recover an approximate
     # pre-volume level so the UI can optionally apply its own volume response.
     scale = max((volume / 100) ** 3, 1e-6)
-    bands = []
-    boundaries = BOUNDARIES if count == 5 else tuple(40 * (10000 / 40) ** (i / count) for i in range(count + 1))
-    for low, high in zip(boundaries, boundaries[1:]):
-        energy = sum(abs(values[i]) ** 2 for i in range(max(1, math.ceil(low * SIZE / RATE)),
-                                                      min(SIZE // 2, max(math.ceil(low * SIZE / RATE) + 1, math.ceil(high * SIZE / RATE)))))
-        rms = math.sqrt(energy) * math.sqrt(2 / 0.375) / SIZE / scale
-        db = 20 * math.log10(max(rms, 1e-12))
-        bands.append(max(0, min(1, (db + 72) / 57)))
-    return bands
+    results = []
+    for count in counts:
+        bands = []
+        boundaries = BOUNDARIES if count == 5 else tuple(40 * (10000 / 40) ** (i / count) for i in range(count + 1))
+        for low, high in zip(boundaries, boundaries[1:]):
+            energy = sum(abs(values[i]) ** 2 for i in range(max(1, math.ceil(low * SIZE / RATE)),
+                                                          min(SIZE // 2, max(math.ceil(low * SIZE / RATE) + 1, math.ceil(high * SIZE / RATE)))))
+            rms = math.sqrt(energy) * math.sqrt(2 / 0.375) / SIZE / scale
+            db = 20 * math.log10(max(rms, 1e-12))
+            bands.append(max(0, min(1, (db + 72) / 57)))
+        results.append(bands)
+
+    return results
+
+
+def spectrum(samples, volume=100, count=5):
+    return spectra(samples, volume, (count,))[0]
 
 
 def player_node(objects, pid):

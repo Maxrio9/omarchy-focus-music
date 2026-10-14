@@ -251,3 +251,7 @@ For a playback smoke test, point `FOCUS_MUSIC_RUNTIME` and `FOCUS_MUSIC_STATE` a
 ## License and music credits
 
 Plugin code is [MIT licensed](LICENSE). The music belongs to its respective artists and rights holders. This repository distributes source metadata and player code, not audio recordings. Support the artists and channels through the source links.
+
+## Performance
+
+The visualizer shares one FFT between the bar and popup, and the widget receives status from its existing media bridge rather than repeatedly starting the controller. See the [measured performance review](docs/performance.md) for CPU/RAM samples, their limits, and the Rust tradeoff.

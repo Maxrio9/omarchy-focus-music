@@ -1,4 +1,5 @@
-import importlib.machinery, importlib.util, tempfile
+import importlib.machinery, importlib.util, tempfile, io, json
+from contextlib import redirect_stdout
 from pathlib import Path
 from gi.repository import Gio, GLib
 loader=importlib.machinery.SourceFileLoader('bridge',str(Path(__file__).resolve().parents[1] / 'bin/focus-media'))
@@ -8,7 +9,16 @@ class Fake:
  def sync_other_media(self,a): self.events.append(a)
  def status(self): return {'phase':'Playing','title':'Test','artist':'Artist','track_id':'test','volume':25}
 with tempfile.TemporaryDirectory() as d:
- fake=Fake(d);bridge=m.Bridge(fake);bridge.tick()
+ fake=Fake(d);bridge=m.Bridge(fake)
+ stream=io.StringIO()
+ with redirect_stdout(stream):bridge.tick()
+ assert json.loads(stream.getvalue())['phase']=='Playing'
+ stream=io.StringIO()
+ with redirect_stdout(stream):bridge.tick()
+ assert not stream.getvalue(), 'Unchanged status should not generate repeated UI work'
+ bridge.status_sent=0
+ with redirect_stdout(stream):bridge.tick()
+ assert json.loads(stream.getvalue())['phase']=='Playing', 'Heartbeat must keep fallback polling asleep'
  context=GLib.MainContext.default()
  for i in range(20):
   while context.pending(): context.iteration(False)

@@ -2,6 +2,8 @@
 """MPRIS bridge. Yield the media keys while another MPRIS player is playing."""
 import fcntl
 import hashlib
+import json
+import time
 import importlib.machinery
 import importlib.util
 from pathlib import Path
@@ -51,6 +53,8 @@ class Bridge:
         self.owner = 0
         self.current = {}
         self.last = None
+        self.last_status = None
+        self.status_sent = 0
         info = Gio.DBusNodeInfo.new_for_xml(XML)
         for interface in info.interfaces:
             self.bus.register_object(PATH, interface, self.method, self.get_property, self.set_property)
@@ -86,6 +90,12 @@ class Bridge:
                 fcntl.flock(lock, fcntl.LOCK_EX)
                 self.player.sync_other_media(active)
             self.current = self.player.status()
+            encoded = json.dumps(self.current, ensure_ascii=False)
+            now = time.monotonic()
+            if encoded != self.last_status or now - self.status_sent >= 2:
+                print(encoded, flush=True)
+                self.last_status = encoded
+                self.status_sent = now
             # Omarchy prefers the oldest playing source. Withdraw our control
             # endpoint while other media plays, including in duck/no-action mode.
             if active and self.owner:

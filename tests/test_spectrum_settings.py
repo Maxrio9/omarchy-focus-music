@@ -12,7 +12,7 @@ from unittest.mock import patch
 from test_focus_music import ROOT, load_player
 
 sys.path.insert(0, str(ROOT / 'lib'))
-from focus_spectrum import SIZE, RATE, spectrum, player_node, bar_count
+from focus_spectrum import SIZE, RATE, spectrum, spectra, player_node, bar_count
 import focus_preferences
 
 
@@ -31,6 +31,13 @@ class SpectrumTests(unittest.TestCase):
         quiet = spectrum([value * 0.2 ** 3 for value in reference], 20)
         for a, b in zip(loud, quiet):
             self.assertAlmostEqual(a, b, places=5)
+
+    def test_shared_fft_matches_independent_band_results(self):
+        samples = [.15 * math.sin(2 * math.pi * 1000 * i / RATE) for i in range(SIZE)]
+        for count in (5, 6, 14, 30):
+            shared = spectra(samples, 35, (count, 5))
+            self.assertEqual(shared[0], spectrum(samples, 35, count))
+            self.assertEqual(shared[1], spectrum(samples, 35, 5))
 
     def test_wider_bar_pitch_and_idle_count(self):
         self.assertEqual(bar_count(80), 5)

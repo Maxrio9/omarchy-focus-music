@@ -44,10 +44,22 @@ BarWidget {
         var changes = {}; changes[key] = value
         runAction("settings-set", JSON.stringify(changes))
     }
+    property double mediaStatusAt: 0
     Process {
         id: mediaBridge
         command: ["/usr/bin/python3", decodeURIComponent(String(Qt.resolvedUrl("bin/focus-media")).replace(/^file:\/\//, ""))]
         running: true
+        stdout: SplitParser {
+            onRead: function(line) {
+                try {
+                    var status = JSON.parse(line)
+                    if (status.phase !== undefined) {
+                        root.player = status
+                        root.mediaStatusAt = Date.now()
+                    }
+                } catch (e) {}
+            }
+        }
     }
     Timer { interval: 5000; running: true; repeat: true; onTriggered: if (!mediaBridge.running) mediaBridge.running = true }
     Timer { id: preferenceGrace; interval: 1500 }
@@ -165,7 +177,7 @@ BarWidget {
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: if (!poll.running) poll.running = true
+        onTriggered: if (!poll.running && Date.now() - root.mediaStatusAt > 3000) poll.running = true
     }
     WidgetButton {
         id: button
@@ -485,7 +497,7 @@ BarWidget {
                     width: parent.width
                     label: "Bar display"
                     value: root.displayMode
-                    options: [{value:"banner", label:"Scrolling track banner"}, {value:"visualizer", label:"Visualizer"}, {value:"icon", label:"Compact music icon"}]
+                    options: [{value:"banner", label:"Banner"}, {value:"visualizer", label:"Visualizer"}, {value:"icon", label:"Compact music icon"}]
                     onChanged: function(value) { root.savePreference("barDisplay", value) }
                     onPopupOpenChanged: if (popupOpen) { placementSelect.close(); otherMediaSelect.close() }
                 }

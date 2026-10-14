@@ -17,7 +17,7 @@ import time
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'lib'))
-from focus_spectrum import SIZE, RATE, spectrum, player_node, bar_count
+from focus_spectrum import SIZE, RATE, spectra, player_node, bar_count
 
 
 def main():
@@ -86,7 +86,8 @@ def main():
                 buffer = buffer[SIZE * 4:]
                 if sys.byteorder != 'little':
                     samples.byteswap()
-                print(json.dumps({'bands': spectrum(samples, volume, count), 'popupBands': spectrum(samples, volume), 'state': 'active'}), flush=True)
+                bands, popup_bands = spectra(samples, volume, (count, 5))
+                print(json.dumps({'bands': bands, 'popupBands': popup_bands, 'state': 'active'}), flush=True)
     finally:
         selector.close()
         capture.terminate()
