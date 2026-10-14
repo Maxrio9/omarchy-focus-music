@@ -1,0 +1,1 @@
+          onHoveredChanged: root.setCenterSectionHovered(hovered)

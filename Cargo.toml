@@ -1,0 +1,32 @@
+[package]
+name = "omarchy-focus-music"
+version = "2.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "focus-music"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+rand = "0.9"
+rustfft = "6.4"
+libc = "0.2"
+ctrlc = { version = "3", features = ["termination"] }
+zbus = "5"
+regex = "1"
+percent-encoding = "2"
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

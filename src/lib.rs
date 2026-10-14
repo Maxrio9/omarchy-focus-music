@@ -1,0 +1,12 @@
+pub mod catalog;
+pub mod compact;
+pub mod controller;
+pub mod ipc;
+pub mod library;
+pub mod media;
+pub mod normalizer;
+pub mod preferences;
+pub mod rpc;
+pub mod spectrum;
+pub mod util;
+pub mod visualizer;

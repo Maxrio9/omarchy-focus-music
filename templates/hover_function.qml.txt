@@ -1,0 +1,20 @@
+  // Only the actual center widgets trigger a reveal. The stock handler's
+  // parent spans the bar; hovering the right-side icons must keep them usable.
+  function updateCenterHover(handler) {
+    var window = handler.parent.QsWindow.window
+    var hit = false
+    if (handler.hovered) {
+      for (var i = 0; i < root.moduleSlots.length; i++) {
+        var slot = root.moduleSlots[i]
+        if (!slot || slot.region !== "center" || slot.width <= 0 ||
+            !slot.visible || root.targetWindow(slot) !== window) continue
+        var point = slot.mapFromItem(handler.parent, handler.point.position.x, handler.point.position.y)
+        if (point.x >= 0 && point.y >= 0 && point.x < slot.width && point.y < slot.height) {
+          hit = true
+          break
+        }
+      }
+    }
+    root.setCenterSectionHovered(hit)
+  }
+

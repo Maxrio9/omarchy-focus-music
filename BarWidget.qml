@@ -17,7 +17,7 @@ BarWidget {
     function open() { popupPinned = true; popupOpen = true }
     function close() { popupOpen = false; popupPinned = false; settingsOpen = false }
     function runAction(action, argument) {
-        var command = ["python3", controllerPath, action]
+        var command = [controllerPath, action]
         if (argument !== undefined) command.push(String(argument))
         Quickshell.execDetached(command)
     }
@@ -41,13 +41,27 @@ BarWidget {
         if (key === "placement" && value === "right") next.barDisplay = "icon"
         preferences = next
         preferenceGrace.restart()
-        var changes = {}; changes[key] = value
-        runAction("settings-set", JSON.stringify(changes))
+        var changes = Object.assign({}, preferenceQueue)
+        changes[key] = value
+        preferenceQueue = changes
+        flushPreferences()
+    }
+    property var preferenceQueue: ({})
+    function flushPreferences() {
+        if (preferenceChange.running || Object.keys(preferenceQueue).length === 0) return
+        var changes = preferenceQueue
+        preferenceQueue = ({})
+        preferenceChange.command = [controllerPath, "settings-set", JSON.stringify(changes)]
+        preferenceChange.running = true
+    }
+    Process {
+        id: preferenceChange
+        onExited: Qt.callLater(root.flushPreferences)
     }
     property double mediaStatusAt: 0
     Process {
         id: mediaBridge
-        command: ["/usr/bin/python3", decodeURIComponent(String(Qt.resolvedUrl("bin/focus-media")).replace(/^file:\/\//, ""))]
+        command: [decodeURIComponent(String(Qt.resolvedUrl("bin/focus-media")).replace(/^file:\/\//, ""))]
         running: true
         stdout: SplitParser {
             onRead: function(line) {
@@ -65,7 +79,7 @@ BarWidget {
     Timer { id: preferenceGrace; interval: 1500 }
     Process {
         id: spectrumProcess
-        command: ["python3", decodeURIComponent(String(Qt.resolvedUrl("bin/focus-visualizer")).replace(/^file:\/\//, ""))]
+        command: [decodeURIComponent(String(Qt.resolvedUrl("bin/focus-visualizer")).replace(/^file:\/\//, ""))]
         stdout: SplitParser {
             onRead: function(line) {
                 try { var frame = JSON.parse(line); root.spectrumBands = frame.bands || [0, 0, 0, 0, 0]; root.popupBands = frame.popupBands || root.spectrumBands.slice(0, 5) } catch (e) {}
@@ -91,7 +105,7 @@ BarWidget {
     function flushPlayback() {
         if (playbackChange.running || !playbackPending) return
         playbackPending = false
-        playbackChange.command = ["python3", controllerPath, "pause-set", playbackOverride === "Paused" ? "1" : "0"]
+        playbackChange.command = [controllerPath, "pause-set", playbackOverride === "Paused" ? "1" : "0"]
         playbackChange.running = true
     }
     Process {
@@ -136,7 +150,7 @@ BarWidget {
     function flushVolume() {
         if (volumeChange.running || !volumePending) return
         volumePending = false
-        volumeChange.command = ["python3", controllerPath, "volume-set", String(displayedVolume)]
+        volumeChange.command = [controllerPath, "volume-set", String(displayedVolume)]
         volumeChange.running = true
     }
     Process {
@@ -154,7 +168,7 @@ BarWidget {
 
     Process {
         id: poll
-        command: ["python3", root.controllerPath, "status"]
+        command: [root.controllerPath, "status"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try { root.player = JSON.parse(text) } catch (e) {}
@@ -164,7 +178,7 @@ BarWidget {
     Process {
         id: genrePoll
         onExited: Qt.callLater(root.refreshGenres)
-        command: ["python3", root.controllerPath, "genres"]
+        command: [root.controllerPath, "genres"]
         running: true
         stdout: StdioCollector {
             onStreamFinished: {

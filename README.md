@@ -32,12 +32,12 @@ Open Focus Music from its bar widget. Installation does not add an entry to the 
 
 ## Install
 
-Requires **Omarchy 4's Quickshell bar** with the `qs.Commons` and `qs.Ui` components (`PopupCard`, `Dropdown`, and the bar buttons), Python 3.8+, and **mpv 0.38+**. Streaming requires a recent yt-dlp; local indexing and loudness measurement require FFmpeg. Tested on Omarchy 4.0.4 with mpv 0.41. Other Omarchy versions must provide the same shell UI API. A plain Hyprland installation or a Waybar-based Omarchy bar can use the command-line player; the QML widget requires the Omarchy shell. `notify-send` is optional and provides error notifications.
+Requires **Omarchy 4's Quickshell bar** with the `qs.Commons` and `qs.Ui` components (`PopupCard`, `Dropdown`, and the bar buttons), **mpv 0.38+**, and a Linux x86-64 or ARM64 desktop. Portable Rust binaries are bundled; installation does not require a compiler or a Python runtime for the plugin. Streaming requires a recent yt-dlp; local indexing and loudness measurement require FFmpeg. Tested on Omarchy 4.0.4 with mpv 0.41. Other Omarchy versions must provide the same shell UI API. A plain Hyprland installation or a Waybar-based Omarchy bar can use the command-line player; the QML widget requires the Omarchy shell. `notify-send` is optional and provides error notifications.
 
 Install any missing dependencies:
 
 ```bash
-omarchy pkg add python python-gobject mpv yt-dlp ffmpeg libnotify
+omarchy pkg add mpv yt-dlp ffmpeg libnotify
 ```
 
 Then install and enable the plugin:
@@ -169,7 +169,7 @@ The standard Play/Pause, Next, and Previous keys control Focus Music through [MP
 
 The default **Pause and resume** setting pauses the music during other playback and resumes the same track afterwards. Music you manually paused stays paused. Volume reduction keeps your chosen volume intact and restores it afterwards; scrolling during reduced playback changes that chosen volume. Slight reduction uses 75% of the mpv volume setting and substantial reduction uses 40% (mpv's volume curve makes the audible reduction stronger). **No action** keeps playback and volume unchanged.
 
-Detection requires other applications to expose MPRIS playback status; silent applications or players without MPRIS cannot trigger this behavior. The bridge uses system Python and `python-gobject` on Arch/Omarchy (PyGObject's Gio bindings on other distributions). It runs while the widget is enabled. Disabling the widget restores any automatic pause or volume reduction.
+Detection requires other applications to expose MPRIS playback status; silent applications or players without MPRIS cannot trigger this behavior. The native Rust bridge connects directly to the session D-Bus. It runs while the widget is enabled. Disabling the widget restores any automatic pause or volume reduction.
 
 ## Display settings and visualization
 
@@ -239,11 +239,12 @@ Saved volume and queue state remain in your user state directory.
 
 ## Development
 
-The controller uses only Python's standard library. Offline tests check catalog durations and duplicate entries, shuffle consumption, segment boundaries, portable paths, clean installs with spaces and Unicode, unset/empty/custom XDG directories, track credits, mpv's JSON IPC framing, local folder/tag indexing, offline loudness measurement, both clock placements, the compact-bar patch, and track-wide normalization. Waveform tests verify that differently mastered levels converge while quiet/loud contrast stays intact.
+The controller, MPRIS bridge, visualizer, local-library indexer, loudness helper, and maintenance tools are written in Rust. QML remains the Omarchy frontend, and the small Lua hook forwards mpv events to the native helper. Offline tests check catalog durations and duplicate entries, shuffle consumption, segment boundaries, portable paths, clean installs with spaces and Unicode, unset/empty/custom XDG directories, track credits, mpv's JSON IPC framing, local folder/tag indexing, offline loudness measurement, both clock placements, the compact-bar patch, and track-wide normalization. Waveform tests verify that differently mastered levels converge while quiet/loud contrast stays intact.
 
 ```bash
-python -m unittest discover -s tests -v
-python scripts/audit-catalog.py
+cargo test --locked
+cargo clippy --locked --all-targets -- -D warnings
+scripts/audit-catalog
 omarchy plugin validate .
 ```
 
@@ -253,6 +254,18 @@ For a playback smoke test, point `FOCUS_MUSIC_RUNTIME` and `FOCUS_MUSIC_STATE` a
 
 Plugin code is [MIT licensed](LICENSE). The music belongs to its respective artists and rights holders. This repository distributes source metadata and player code, not audio recordings. Support the artists and channels through the source links.
 
+## Build from source
+
+The bundled binaries support `x86_64` and `aarch64` Linux and use a static musl build. Their checksums are in `libexec/SHA256SUMS`; all backend source is under `src/`. For development, install Rust with rustup, then run:
+
+```bash
+scripts/build-native x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+```
+
+The repository pins the compiler in `rust-toolchain.toml`. The build script strips contributor paths from binaries. Normal installation uses the bundled binary for your CPU; it does not download a toolchain or change shell configuration. `FOCUS_MUSIC_BINARY` can point at a development build, and `FOCUS_MUSIC_PACKAGE` can select its package directory.
+
+The player keeps the same configuration, state and loudness-cache locations as earlier versions. If upgrading a running pre-2.0 player, run the controller's `restart-player` command once: it replaces mpv's old helper hook while preserving the indexed queue, current position, pause state, volume and generation. This briefly restarts playback. Restart the shell afterwards to load the new frontend commands.
+
 ## Performance
 
-The visualizer shares one FFT between the bar and popup, and the widget receives status from its existing media bridge rather than repeatedly starting the controller. See the [measured performance review](docs/performance.md) for CPU/RAM samples, their limits, and the Rust tradeoff.
+The native visualizer shares one FFT between the bar and popup, and the widget receives status from the native media bridge rather than repeatedly starting the controller. See the [measured performance review](docs/performance.md) for CPU/RAM samples, their limits, and the native backend comparison.

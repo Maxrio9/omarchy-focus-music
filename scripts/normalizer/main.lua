@@ -29,7 +29,7 @@ local function analyze(token, index, generation)
     set_state('measuring')
     mp.command_native_async({name = 'subprocess', playback_only = false,
         capture_stdout = true, capture_stderr = true,
-        args = {'python3', helper, 'current', tostring(index), tostring(generation)}},
+        args = {helper, 'current', tostring(index), tostring(generation)}},
         function(success, result)
             if token ~= serial then return end
             local parsed = success and result.status == 0 and utils.parse_json(result.stdout) or nil
@@ -45,7 +45,7 @@ local function analyze(token, index, generation)
             apply_gain(parsed.gain_db, token)
             mp.command_native_async({name = 'subprocess', playback_only = false,
                 capture_stdout = true, capture_stderr = true,
-                args = {'python3', helper, 'prefetch', tostring(index), tostring(generation)}}, function() end)
+                args = {helper, 'prefetch', tostring(index), tostring(generation)}}, function() end)
         end)
 end
 
@@ -59,7 +59,7 @@ local function on_file_loaded()
     local index = mp.get_property_number('playlist-pos', 0)
     mp.command_native_async({name = 'subprocess', playback_only = false,
         capture_stdout = true, capture_stderr = true,
-        args = {'python3', controller, 'status'}}, function(success, result)
+        args = {controller, 'status'}}, function(success, result)
             if token ~= serial then return end
             local status = success and result.status == 0 and utils.parse_json(result.stdout) or nil
             if status and status.generation then analyze(token, index, status.generation)

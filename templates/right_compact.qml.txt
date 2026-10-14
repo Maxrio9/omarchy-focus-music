@@ -1,0 +1,14 @@
+  component RightModules: ModuleList {
+    entries: root.layoutEntries("right")
+    region: "right"
+    // Focus Music compact bar: retain the widgets and their services while
+    // clipping the right section during a center reveal on narrow screens.
+    readonly property bool compactHidden: root.centerSectionRevealHeld
+      && !root.centerHoverRevealSuppressed
+      && (root.vertical || parent.width < 1600)
+    opacity: compactHidden ? 0 : 1
+    enabled: !compactHidden
+    clip: true
+    width: compactHidden && !root.vertical ? 0 : (item ? item.implicitWidth : 0)
+    height: compactHidden && root.vertical ? 0 : (item ? item.implicitHeight : 0)
+  }

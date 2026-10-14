@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+focus_script_dir=$(dirname -- "$(readlink -f -- "$0")")
+focus_package=$(cd -- "$focus_script_dir/.." && pwd)
+export FOCUS_MUSIC_PACKAGE="${FOCUS_MUSIC_PACKAGE:-$focus_package}"
+if [ -n "${FOCUS_MUSIC_BINARY:-}" ]; then
+  exec "$FOCUS_MUSIC_BINARY" "$@"
+fi
+focus_arch=$(uname -m)
+case "$focus_arch" in
+  x86_64|aarch64) ;;
+  *) echo 'Focus Music: unsupported CPU architecture; see README build instructions.' >&2; exit 1 ;;
+esac
+focus_binary="$focus_package/libexec/$focus_arch/focus-music"
+if [ ! -x "$focus_binary" ] && [ -x "$focus_package/target/release/focus-music" ]; then
+  focus_binary="$focus_package/target/release/focus-music"
+fi
+if [ ! -x "$focus_binary" ]; then
+  echo 'Focus Music: native binary is missing; see README build instructions.' >&2
+  exit 1
+fi
+exec "$focus_binary" "$@"

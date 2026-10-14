@@ -1,0 +1,4 @@
+  component RightModules: ModuleList {
+    entries: root.layoutEntries("right")
+    region: "right"
+  }

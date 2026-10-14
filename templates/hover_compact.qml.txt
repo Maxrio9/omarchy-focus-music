@@ -1,0 +1,3 @@
+          id: compactCenterHover
+          onHoveredChanged: root.updateCenterHover(compactCenterHover)
+          onPointChanged: root.updateCenterHover(compactCenterHover)

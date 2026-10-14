@@ -1,47 +1,46 @@
 # Performance review
 
-Measured on the development desktop during steady-state online playback, using eight-second CPU samples from `/proc/PID/stat` and memory readings from `/proc/PID/smaps_rollup`. These are short observations, not guaranteed limits. CPU percentages use **one logical core as 100%**.
+## Rust backend in 2.0.0
 
-| Process | CPU, one core | Resident RAM (RSS) | Proportional RAM (PSS) |
+Measured on the same desktop and paused mpv stream, comparing the previous 1.7.6 Python backend with the bundled x86-64 Rust release build. Each helper ran for a three-second warmup and an eight-second CPU sample. Memory came from `/proc/PID/smaps_rollup`; CPU came from `/proc/PID/stat`. CPU percentages use **one logical core as 100%**, with approximately 0.125 percentage-point sampling resolution. These short observations describe this workload, not guaranteed limits.
+
+The bridges ran separately in private D-Bus sessions with copied state and preferences. The visualizers captured the same player's output. Measurements did not change playback, system volume, or the production bridge's media-key ownership.
+
+| Helper | CPU, one core | Resident RAM (RSS) | Proportional RAM (PSS) |
 | --- | ---: | ---: | ---: |
-| mpv, current streaming playback | 0.8–0.9% | 173–176 MiB | 126–129 MiB |
-| MPRIS media bridge | 0.5–0.6% | 42 MiB | 26 MiB |
-| Optimized live visualizer | 3.1% | 26 MiB | 20 MiB |
-| PipeWire capture helper | under 0.13% sampling resolution | 9 MiB | 3 MiB |
+| Python bridge | 0.375% | 41.17 MiB | 25.25 MiB |
+| Rust bridge | 0.500% | 11.63 MiB | 11.62 MiB |
+| Python visualizer | 0.875% | 26.86 MiB | 20.35 MiB |
+| Rust visualizer | 0.750% | 5.60 MiB | 5.59 MiB |
 
-The visualizer and capture helper run only when visible during playback. Dedicated processes therefore used approximately **215–218 MiB RSS without visualization** and **250–253 MiB with visualization** in these samples. PSS totals were about 153–156 MiB and 176–179 MiB respectively; PSS apportions shared library pages rather than counting them fully in every process.
+Combined helper RSS dropped from **68.0 to 17.2 MiB**, about **75% less**. The visualizer retains its frequency-band calculations, frame rate, volume response, and separate bar/popup layouts. It shares one native FFT between both displays. The native bridge includes a private command server with the catalog already loaded.
 
-These totals exclude the existing shared Omarchy shell, UI rendering, and transient helpers. The shell also hosts the rest of the desktop bar, so assigning its entire memory or CPU use to Focus Music would be misleading. Short-lived controller calls and first-time FFmpeg/yt-dlp loudness analysis can add CPU and memory bursts. Streaming buffers, codecs, track changes, other media players, and system load affect results. An idle mpv instance can retain buffers from earlier playback.
+The visualizer and its PipeWire capture subprocess run only when visible during playback. The bridge runs while the widget is enabled. PipeWire's `pw-cat` capture helper remains a separate native process; it previously measured about 9 MiB RSS and under the 0.13% CPU sampling resolution.
 
-## Improvements in 1.7.2
+The player was paused during this final comparison, so the CPU values above describe paused helpers, not active FFT work. An earlier active-playback comparison, before adding the cached command server, measured the Python visualizer at 3.375% and the Rust visualizer at 0.125% of one core; helper RSS was again approximately 68 MiB versus 17 MiB. These distinct workloads should not be combined into a single CPU reduction claim.
 
-The visualizer previously performed the same 1,024-sample FFT twice per frame. A shared transform now supplies both the quickbar bands and the five popup bands. A 300-frame CPU-time benchmark dropped from **2.26 to 1.14 ms per frame**; live helper CPU fell from **5.5% to 3.1% of one core**. Spectrum regression tests confirm the same band results.
+### Controller response
 
-Status polling also started Python and parsed the full catalog on every refresh. Twenty representative calls averaged **47 ms of CPU time each**, equivalent to roughly **2.4% of one core** at two-second polling intervals or **11.8%** at the former 400 ms popup interval. The widget now consumes status changes and heartbeats from its existing media bridge, eliminating those repeated calls in normal operation. Polling remains available if the bridge is absent or stops delivering status. The live CPU table was measured before deploying this status-stream change; the visualizer optimization was included.
+Thirty sequential status commands per implementation included launcher and process startup. The cached Rust measurement used the running native bridge; the cold Rust measurement had no bridge.
 
-## Would Rust help?
-
-A Rust implementation of the media bridge and spectrum helper could reduce interpreter memory and FFT CPU costs. That is an architectural expectation, not a measured Rust result. It would not remove mpv's playback buffers, FFmpeg's analysis work, or the shared Qt/Quickshell renderer, which already use native code. Rewriting the complete plugin would also add packaging, binary distribution, and maintenance work.
-
-The immediate gains came from removing duplicate computation and repeated process startup. Keep the QML interface and mpv playback. If further savings are needed, profile a small native spectrum helper or a single persistent backend first, then compare real playback measurements before committing to a full rewrite.
-
-## Estimated next improvements
-
-These estimates keep mpv, the current visualization rate, and the QML interface. They describe total dedicated-process RSS and steady-state CPU with the visualizer active, excluding the shared desktop shell and analysis bursts. They are planning targets, not measurements of completed alternative implementations.
-
-| Approach | Estimated total RSS | Estimated CPU, one core |
+| Controller | Wall time per call | Child CPU time per call |
 | --- | ---: | ---: |
-| Current measured implementation | about 254 MiB | about 4.8% |
-| Further pure-Python cleanup | 225–235 MiB | 3.5–4.3% |
-| Python backend with a native FFT routine | 225–240 MiB | 2–3% |
-| One persistent Rust backend, retaining mpv/QML | 195–210 MiB | 1–2% |
+| Python CLI | 48.07 ms | 47.15 ms |
+| Rust CLI | 39.56 ms | 39.22 ms |
+| Rust cached CLI | 10.76 ms | 9.43 ms |
 
-The Python memory target comes from removing duplicate catalogs, loading less controller code in the visualizer, and potentially sharing one persistent backend. Isolated import measurements found approximately **11 MiB extra RSS per helper** from importing the full controller/catalog. FFT-only imports used 13.7 MiB RSS versus 24.8 MiB with the controller; Gio imports used 28.5 MiB versus 39.8 MiB with it. These are startup measurements and do not include live audio or all bridge objects.
+Normal widget actions use the cached catalog through a private Unix socket instead of reparsing it in each new process. CLI control remains available when the widget is absent through the standalone fallback. The bridge sends changes immediately after acknowledged actions and publishes periodic status heartbeats, so the widget does not need repeated controller startup for routine updates. First-time streaming resolution, file indexing, and loudness scans have their own costs and are outside this status benchmark.
 
-A temporary benchmark retained Python for windowing and band aggregation while calling an installed native FFT library through ctypes. It measured **1.20 ms/frame** for the current Python transform path versus **0.23 ms/frame** for the native path, with matching band results. This demonstrates a possible CPU gain without changing the backend language; it is not an installed plugin change or a commitment to a particular dependency. The experiment used the [FFTW real-data transform API](https://www.fftw.org/fftw3_doc/One_002dDimensional-DFTs-of-Real-Data.html).
+### What remains
 
-The Rust estimate assumes a compact, unified backend using direct D-Bus bindings rather than retaining the Python/Gio process. It could replace roughly 68 MiB of Python helper RSS with a backend budget of roughly 8–20 MiB, while retaining mpv and the capture helper. No Rust prototype has been measured, so implementation choices could move those numbers substantially.
+mpv still decodes and buffers the audio. Earlier streaming observations measured roughly 173–178 MiB RSS for mpv; that component was not rewritten or reduced by this port. FFmpeg handles loudness analysis, yt-dlp resolves online sources, and PipeWire captures the player's output. QML renders inside the existing native Qt/Quickshell desktop shell. Its total resources cannot fairly be attributed to this widget because it hosts the rest of the desktop too.
 
-mpv currently accounts for about 178 MiB RSS. Numeric cache accounting at the later inspection showed about **16 MiB** of buffered packet data; the configured maximum is a ceiling, not an allocation. A smaller cache can limit peaks but should not be assumed to recover most of mpv's current memory. [mpv's cache documentation](https://mpv.io/manual/stable/#cache) describes how time and byte limits interact. Playback memory deserves a separate profile before promising larger total-RAM savings.
+The Rust port therefore saves roughly 51 MiB of dedicated helper RSS in this sample, rather than removing the player's entire memory use. Excluding the shared desktop shell and transient analysis, adding the earlier mpv and capture samples gives roughly 199–204 MiB dedicated RSS with visualization. This is an estimate using components measured at different times, not a new simultaneous total measurement. PSS apportions shared pages and is usually more useful than summing RSS.
 
-The practical first step is the Python memory cleanup plus a native transform. A Rust backend offers additional memory savings and less interpreter overhead, with higher implementation and distribution effort.
+No reduction in audio buffers, visualization rate, or UI features was needed. Short-lived analysis workers can still add CPU, bandwidth, and memory while a track is measured. Different codecs, caches, track transitions, screen rendering, and system load will change results.
+
+## Verification and portability
+
+Rust integration tests cover queue and segment behavior, state/cache compatibility, settings, private command routing, media keys and other-player handoffs, local indexing, whole-track normalization with preserved dynamics, subprocess cancellation and cleanup, and an actual mpv session upgrade. The QML controls are also exercised through Quickshell on an Omarchy Wayland desktop.
+
+Bundled static musl binaries support x86-64 and ARM64 Linux. The x86-64 build was exercised on the development desktop. The ARM64 build was cross-compiled and inspected, but has not been tested on ARM hardware. Checksums accompany both binaries. A source build is supported through the pinned compiler and build script.
