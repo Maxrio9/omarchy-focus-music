@@ -499,17 +499,7 @@ BarWidget {
                     value: root.displayMode
                     options: [{value:"banner", label:"Banner"}, {value:"visualizer", label:"Visualizer"}, {value:"icon", label:"Note"}]
                     onChanged: function(value) { root.savePreference("barDisplay", value) }
-                    onPopupOpenChanged: if (popupOpen) { placementSelect.close(); otherMediaSelect.close() }
-                }
-                GenreSelector {
-                    id: placementSelect
-                    objectName: "placementSetting"
-                    width: parent.width
-                    label: "Placement"
-                    value: root.preferences.placement
-                    options: [{value:"left", label:"Left of date and time"}, {value:"clock-right", label:"Right of date and time"}, {value:"right", label:"Right-hand icons"}]
-                    onChanged: function(value) { root.savePreference("placement", value) }
-                    onPopupOpenChanged: if (popupOpen) { displaySelect.close(); otherMediaSelect.close() }
+                    onPopupOpenChanged: if (popupOpen) otherMediaSelect.close()
                 }
                 GenreSelector {
                     id: otherMediaSelect
@@ -519,7 +509,7 @@ BarWidget {
                     value: root.preferences.otherMedia || "pause-resume"
                     options: [{value:"pause-resume", label:"Pause and resume · fill silence"}, {value:"duck-strong", label:"Lower volume greatly"}, {value:"duck-gentle", label:"Lower volume slightly"}, {value:"none", label:"No action"}]
                     onChanged: function(value) { root.savePreference("otherMedia", value) }
-                    onPopupOpenChanged: if (popupOpen) { displaySelect.close(); placementSelect.close() }
+                    onPopupOpenChanged: if (popupOpen) displaySelect.close()
                 }
                 RowLayout {
                     visible: root.displayMode === "visualizer"
@@ -559,7 +549,6 @@ BarWidget {
                 onClicked: {
                     genreSelect.close()
                     displaySelect.close()
-                    placementSelect.close()
                     otherMediaSelect.close()
                     root.settingsOpen = !root.settingsOpen
                 }

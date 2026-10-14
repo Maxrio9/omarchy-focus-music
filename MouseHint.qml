@@ -20,14 +20,38 @@ Item {
         border.color: Color.foreground
         opacity: 0.65
     }
-    Rectangle {
-        visible: button === "right"
-        x: parent.width / 2 + Style.space(1)
-        y: Style.space(3)
-        width: parent.width / 2 - Style.space(3)
-        height: Style.space(7)
-        radius: Style.space(2)
-        color: Color.foreground
+    Canvas {
+        visible: root.button === "right"
+        width: Style.space(15)
+        height: parent.height
+        readonly property color ink: Color.foreground
+        onInkChanged: requestPaint()
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            ctx.scale(width / 15, height / 21)
+            // Follow the outer mouse curve, with a straight inner edge and
+            // button seam instead of an oval resembling the wheel.
+            ctx.fillStyle = ink
+            ctx.beginPath()
+            ctx.moveTo(8.5, 1.8)
+            ctx.bezierCurveTo(11.3, 2, 13.6, 4.3, 13.6, 7.4)
+            ctx.lineTo(13.6, 10)
+            ctx.lineTo(8.5, 10)
+            ctx.closePath()
+            ctx.fill()
+            ctx.globalAlpha = 0.45
+            ctx.strokeStyle = ink
+            ctx.lineWidth = 0.6
+            ctx.beginPath()
+            ctx.moveTo(7.5, 2)
+            ctx.lineTo(7.5, 10)
+            ctx.moveTo(2, 10.5)
+            ctx.lineTo(13, 10.5)
+            ctx.stroke()
+        }
     }
     Rectangle {
         x: Style.space(6)
@@ -38,19 +62,6 @@ Item {
         color: Color.foreground
         visible: root.button !== "scroll"
         opacity: button === "middle" ? 1 : 0.35
-    }
-    // Short radial marks indicate a wheel press; arrows are reserved for scroll.
-    Repeater {
-        model: root.button === "middle" ? 3 : 0
-        Rectangle {
-            required property int index
-            x: Style.space(index === 0 ? 3 : index === 1 ? 7 : 11)
-            y: Style.space(index === 1 ? 11 : 10)
-            width: Style.space(1)
-            height: Style.space(3)
-            rotation: index === 0 ? 35 : index === 2 ? -35 : 0
-            color: Color.foreground
-        }
     }
     Rectangle {
         visible: root.button === "scroll"
