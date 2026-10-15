@@ -295,10 +295,13 @@ impl Controller {
             .truncate(true)
             .write(true)
             .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW)
             .open(self.paths.runtime.join("player.log"))?;
         let mut command = Command::new(mpv);
         command.args([
             "--no-config",
+            "--load-scripts=no",
+            "--load-unsafe-playlists=no",
             "--no-video",
             "--idle=yes",
             "--keep-open=no",

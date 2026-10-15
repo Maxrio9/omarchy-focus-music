@@ -3,6 +3,19 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
+  pipewire-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build isolated PipeWire test environment
+        run: docker build --tag focus-music-pipewire-test --file build/pipewire-test.Dockerfile build
+      - name: Test stock policy without access to host audio devices or session
+        run: |
+          docker run --rm --user 1000:1000 \
+            --mount "type=bind,source=$PWD,target=/src,readonly" --workdir /src \
+            --env HOME=/tmp --env CARGO_HOME=/tmp/cargo --env CARGO_TARGET_DIR=/tmp/target \
+            --env FOCUS_REQUIRE_PIPEWIRE_TEST=1 focus-music-pipewire-test \
+            cargo test --locked --test pipewire -- --nocapture
   test:
     runs-on: ubuntu-latest
     steps:

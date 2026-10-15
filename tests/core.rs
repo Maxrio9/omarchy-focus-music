@@ -239,6 +239,20 @@ fn never_selects_microphone_or_another_app() {
         visualizer::player_node(objects.as_array().unwrap(), 456),
         None
     );
+    let mut missing_serial = objects.clone();
+    missing_serial[3]["info"]["props"]
+        .as_object_mut()
+        .unwrap()
+        .remove("object.serial");
+    assert_eq!(
+        visualizer::player_node(missing_serial.as_array().unwrap(), 123),
+        None
+    );
+    missing_serial[3]["info"]["props"]["object.serial"] = json!(0);
+    assert_eq!(
+        visualizer::player_node(missing_serial.as_array().unwrap(), 123),
+        None
+    );
 }
 #[test]
 fn compact_patch_is_scoped_and_idempotent() {

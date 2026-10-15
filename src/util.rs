@@ -8,16 +8,17 @@ use std::{
     os::{
         fd::AsRawFd,
         unix::{
-            fs::{OpenOptionsExt, PermissionsExt},
+            fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt},
             process::CommandExt,
         },
     },
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 pub static STOP: AtomicBool = AtomicBool::new(false);
+static TEMP_SERIAL: AtomicU64 = AtomicU64::new(0);
 pub fn stopping() -> bool {
     STOP.load(Ordering::Relaxed)
 }
@@ -46,25 +47,47 @@ pub fn runtime() -> PathBuf {
     })
 }
 pub fn private_dir(path: &Path) -> Result<()> {
-    fs::create_dir_all(path)?;
-    fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(path)?;
+    // Do not follow a pre-existing symlink or chmod another user's directory.
+    let directory = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(path)?;
+    if directory.metadata()?.uid() != unsafe { libc::geteuid() } {
+        bail!("Private directory belongs to another user");
+    }
+    directory.set_permissions(fs::Permissions::from_mode(0o700))?;
     Ok(())
 }
 pub fn atomic_json(path: &Path, value: &Value) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    let temporary = path.with_extension(format!(
+        "{}-{}-{}.tmp",
+        std::process::id(),
+        generation(),
+        TEMP_SERIAL.fetch_add(1, Ordering::Relaxed)
+    ));
     let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
+        .create_new(true)
         .write(true)
         .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
         .open(&temporary)?;
-    file.write_all(&serde_json::to_vec(value)?)?;
-    file.sync_all()?;
-    fs::rename(temporary, path)?;
-    Ok(())
+    let result = (|| {
+        file.write_all(&serde_json::to_vec(value)?)?;
+        file.sync_all()?;
+        fs::rename(&temporary, path)?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }
 pub fn read_json(path: &Path) -> Result<Value> {
     Ok(serde_json::from_slice(&fs::read(path)?)?)
@@ -109,6 +132,7 @@ impl Lock {
             .read(true)
             .write(true)
             .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW)
             .open(path)?;
         let flags = libc::LOCK_EX | if nonblocking { libc::LOCK_NB } else { 0 };
         if unsafe { libc::flock(file.as_raw_fd(), flags) } != 0 {
@@ -248,7 +272,12 @@ pub fn checked_relative(root: &Path, value: &str) -> Result<PathBuf> {
     {
         bail!("Invalid plugin path");
     }
-    Ok(root.join(path))
+    let root = fs::canonicalize(root)?;
+    let resolved = fs::canonicalize(root.join(path))?;
+    if !resolved.starts_with(&root) {
+        bail!("Plugin path escapes its directory");
+    }
+    Ok(resolved)
 }
 pub fn backup_name(prefix: &str) -> String {
     format!("{prefix}-{}-{}", generation(), std::process::id())

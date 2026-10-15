@@ -62,6 +62,7 @@ impl Catalog {
                 bail!("Genre has no tracks: {key}");
             }
             for track in &genre.tracks {
+                crate::library::validate_source(&track.url)?;
                 if !track.start.is_finite()
                     || !track.end.is_finite()
                     || !track.duration.is_finite()

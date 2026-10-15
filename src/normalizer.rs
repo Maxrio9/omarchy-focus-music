@@ -35,6 +35,13 @@ pub fn measure_source(
     duration: f64,
     cancel: Option<&dyn Fn() -> bool>,
 ) -> Result<Value> {
+    library::validate_source(audio)?;
+    let protocols = if let Some(path) = library::local_path(audio) {
+        library::regular_file(&path)?;
+        "file"
+    } else {
+        "http,https,tcp,tls,crypto"
+    };
     let last = Cell::new(Instant::now() - Duration::from_secs(3));
     let cancelled = || {
         if last.get().elapsed() < Duration::from_secs(3) {
@@ -52,6 +59,8 @@ pub fn measure_source(
             "info",
             "-threads",
             "1",
+            "-protocol_whitelist",
+            protocols,
             "-ss",
             &start.to_string(),
             "-i",
@@ -129,12 +138,17 @@ pub fn measurement(
         if !result.success {
             bail!("Could not resolve audio for loudness analysis");
         }
-        String::from_utf8(result.stdout)?
+        let resolved = String::from_utf8(result.stdout)?
             .lines()
             .next()
             .filter(|s| !s.is_empty())
             .context("Could not resolve audio for loudness analysis")?
-            .to_string()
+            .to_string();
+        library::validate_source(&resolved)?;
+        if library::local_path(&resolved).is_some() {
+            bail!("Online audio must resolve to an HTTP(S) URL");
+        }
+        resolved
     };
     let mut result = measure_source(&audio, track.start, track.duration, cancel)?;
     result["schema"] = json!(1);

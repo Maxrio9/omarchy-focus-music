@@ -8,6 +8,37 @@ use std::{
     collections::HashSet, fs, os::unix::fs::MetadataExt, path::PathBuf, process::Command,
     time::Duration,
 };
+// Catalogues describe music files, never player pseudo-protocols or input devices.
+pub fn validate_source(value: &str) -> Result<()> {
+    if value.chars().any(char::is_control) {
+        bail!("Music source contains control characters");
+    }
+    if let Some(path) = local_path(value) {
+        if path.to_string_lossy().chars().any(char::is_control) {
+            bail!("Music filename contains control characters");
+        }
+        match fs::metadata(&path) {
+            Ok(meta) if !meta.is_file() => bail!("Music source is not a regular file"),
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => return Err(error.into()),
+            _ => (),
+        }
+        return Ok(());
+    }
+    if let Some(rest) = value
+        .strip_prefix("https://")
+        .or_else(|| value.strip_prefix("http://"))
+        && !rest.split(['/', '?', '#']).next().unwrap_or("").is_empty()
+    {
+        return Ok(());
+    }
+    bail!("Music sources must be HTTP(S) URLs or absolute local file paths")
+}
+pub fn regular_file(path: &std::path::Path) -> Result<()> {
+    if !fs::metadata(path)?.is_file() {
+        bail!("Music source is not a regular file");
+    }
+    Ok(())
+}
 pub fn local_path(value: &str) -> Option<PathBuf> {
     if let Some(rest) = value.strip_prefix("file:") {
         let path = if let Some(authority) = rest.strip_prefix("//") {
@@ -93,7 +124,8 @@ pub fn index(folder: &str) -> Result<(Value, Vec<String>)> {
                 continue;
             }
             let result = (|| -> Result<Track> {
-                let output=util::capture(Command::new(&ffprobe).args(["-v","error","-select_streams","a:0","-show_entries","format=duration:format_tags=artist,title,album_artist:stream=duration:stream_tags=artist,title,album_artist","-of","json"]).arg(&resolved),Duration::from_secs(30),None)?;
+                regular_file(&resolved)?;
+                let output=util::capture(Command::new(&ffprobe).args(["-v","error","-protocol_whitelist","file","-select_streams","a:0","-show_entries","format=duration:format_tags=artist,title,album_artist:stream=duration:stream_tags=artist,title,album_artist","-of","json"]).arg(&resolved),Duration::from_secs(30),None)?;
                 if !output.success {
                     bail!("Unreadable music");
                 }

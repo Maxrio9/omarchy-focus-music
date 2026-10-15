@@ -31,3 +31,5 @@ omarchy plugin validate .
 ```
 
 Playback and UI tests use isolated players. Quickshell UI tests require an Omarchy Wayland desktop; real session migration requires mpv 0.38+. For manual experiments, isolate state through `FOCUS_MUSIC_CONFIG`, `FOCUS_MUSIC_LOCAL_CONFIG`, `FOCUS_MUSIC_PREFERENCES`, `FOCUS_MUSIC_STATE`, `FOCUS_MUSIC_RUNTIME`, and `FOCUS_MUSIC_CACHE`.
+
+The real capture-policy regression can be run with `cargo test --test pipewire -- --nocapture` when PipeWire and WirePlumber 0.5+ are available. It uses a private session with synthetic audio only. CI runs it in a separate container and requires it to execute. See [the security review](security-review.md) for the tested boundaries and limitations.

@@ -20,7 +20,10 @@ fn id(value: &Value) -> Option<u64> {
 pub fn player_node(objects: &[Value], pid: u32) -> Option<u64> {
     let clients: HashSet<_> = objects
         .iter()
-        .filter(|v| id(&v["info"]["props"]["application.process.id"]) == Some(pid as u64))
+        .filter(|v| {
+            util::text(&v["type"]).ends_with(":Client")
+                && id(&v["info"]["props"]["application.process.id"]) == Some(pid as u64)
+        })
         .filter_map(|v| id(&v["id"]))
         .collect();
     objects.iter().find_map(|v| {
@@ -30,7 +33,8 @@ pub fn player_node(objects: &[Value], pid: u32) -> Option<u64> {
             && (id(&props["application.process.id"]) == Some(pid as u64)
                 || id(&props["client.id"]).is_some_and(|id| clients.contains(&id)))
         {
-            id(&props["object.serial"]).or_else(|| id(&v["id"]))
+            // Registry IDs can be reused after removal. Only a stable serial is safe.
+            id(&props["object.serial"]).filter(|serial| *serial > 0)
         } else {
             None
         }
@@ -124,8 +128,13 @@ fn live(paths: &Paths) -> Result<()> {
             "50ms",
             "--target",
             &serial.to_string(),
+            "--properties",
+            // Enforce the boundary in the session manager, before any samples arrive.
+            // Polling alone cannot prevent fallback between identity checks.
+            "node.dont-fallback=true node.dont-reconnect=true node.dont-move=true node.linger=false",
             "-",
         ])
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()?;
@@ -153,9 +162,9 @@ fn live(paths: &Paths) -> Result<()> {
                 playlist = current;
                 rebind = Instant::now() + Duration::from_secs(2);
             }
-            if Instant::now() < rebind {
+            if Instant::now() < rebind || node_checked.elapsed() >= Duration::from_secs(1) {
                 node_checked = Instant::now();
-                if target(pid)? != Some(serial) {
+                if peer_pid(&paths.socket)? != pid || target(pid)? != Some(serial) {
                     break;
                 }
             }
@@ -176,12 +185,6 @@ fn live(paths: &Paths) -> Result<()> {
         if ready == 0 {
             buffer.clear();
             frame(&mut output, vec![0.; bands], vec![0.; 5], "waiting")?;
-            if node_checked.elapsed() > Duration::from_secs(1) {
-                node_checked = Instant::now();
-                if target(pid)? != Some(serial) {
-                    break;
-                }
-            }
             continue;
         }
         let n = input.read(&mut scratch)?;
