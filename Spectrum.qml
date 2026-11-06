@@ -25,16 +25,33 @@ Item {
     implicitHeight: Style.space(24)
     Repeater {
         model: root.barCount
-        Rectangle {
+        Item {
             required property int index
+            objectName: "spectrumBar" + index
             width: root.width / Math.max(1, root.barCount) * 0.7
             x: index * root.width / Math.max(1, root.barCount)
-            anchors.bottom: parent.bottom
-            height: Math.max(Style.space(1.5), root.height * (root.playing ? Number(root.smoothedBands[index] || 0) : 0)
-                             * Math.sqrt(Math.max(0, root.volume) / 100))
-            color: root.foreground
+            height: root.height
             opacity: root.playing ? 0.85 : 0.4
-            Behavior on height { NumberAnimation { duration: Style.duration(55); easing.type: Easing.Linear } }
+            Rectangle {
+                width: parent.width
+                height: parent.height
+                color: root.foreground
+                transform: Scale {
+                    origin.y: root.height
+                    yScale: root.height > 0 ? Math.min(1, Math.max(Style.space(2.5) / root.height,
+                        (root.playing ? Number(root.smoothedBands[index] || 0) : 0)
+                        * Math.sqrt(Math.max(0, root.volume) / 100))) : 0
+                    Behavior on yScale { NumberAnimation { duration: Style.duration(55); easing.type: Easing.Linear } }
+                }
+            }
+            // Keep the visible bottom edge static even at fractional output scales.
+            Rectangle {
+                objectName: "spectrumBaseline" + index
+                anchors.bottom: parent.bottom
+                width: parent.width
+                height: Math.min(parent.height, Style.space(2.5))
+                color: root.foreground
+            }
         }
     }
 }

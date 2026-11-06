@@ -45,11 +45,20 @@ ShellRoot {
    tryVerify(function(){return plugin.item.mediaStatusAt > 0 && plugin.item.player.phase === "Playing"},3000)
    var spectrumComponent = Qt.createComponent(FOCUS_WIDGET_SOURCE.replace("BarWidget.qml", "Spectrum.qml"))
    compare(spectrumComponent.status, Component.Ready)
-   var spectrum = spectrumComponent.createObject(plugin.item, {playing: true})
+   var spectrum = spectrumComponent.createObject(plugin.item, {playing: true, width: 100, height: 19})
    spectrum.bands = [1, 1, 1, 1, 1]
    verify(Math.abs(spectrum.smoothedBands[0] - 0.45) < 0.0001)
    spectrum.bands = [0, 0, 0, 0, 0]
    verify(Math.abs(spectrum.smoothedBands[0] - 0.3375) < 0.0001)
+   var baseline = spectrum.height
+   var fixedBottom = findChild(spectrum, "spectrumBaseline0")
+   verify(fixedBottom !== null)
+   spectrum.bands = [1, 1, 1, 1, 1]
+   for (var frame = 0; frame < 8; ++frame) {
+    wait(10)
+    verify(Math.abs(fixedBottom.mapToItem(spectrum, 0, fixedBottom.height).y - baseline) < 0.01,
+           "The bottom edge must stay fixed during animation: " + fixedBottom.mapToItem(spectrum, 0, fixedBottom.height).y)
+   }
    spectrum.playing = false
    compare(spectrum.smoothedBands.length, 0)
    spectrum.destroy()
