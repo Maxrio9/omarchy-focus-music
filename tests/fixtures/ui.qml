@@ -43,6 +43,16 @@ ShellRoot {
   id:checks;when:false
   function check() {
    tryVerify(function(){return plugin.item.mediaStatusAt > 0 && plugin.item.player.phase === "Playing"},3000)
+   var spectrumComponent = Qt.createComponent(FOCUS_WIDGET_SOURCE.replace("BarWidget.qml", "Spectrum.qml"))
+   compare(spectrumComponent.status, Component.Ready)
+   var spectrum = spectrumComponent.createObject(plugin.item, {playing: true})
+   spectrum.bands = [1, 1, 1, 1, 1]
+   verify(Math.abs(spectrum.smoothedBands[0] - 0.45) < 0.0001)
+   spectrum.bands = [0, 0, 0, 0, 0]
+   verify(Math.abs(spectrum.smoothedBands[0] - 0.3375) < 0.0001)
+   spectrum.playing = false
+   compare(spectrum.smoothedBands.length, 0)
+   spectrum.destroy()
    var popup=findChild(plugin.item,"musicPopup")
    var surfaceHeight=popup.implicitHeight
    var surfaceWidth=popup.implicitWidth
