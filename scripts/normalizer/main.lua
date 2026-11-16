@@ -7,6 +7,28 @@ local serial = 0
 local ramp = nil
 local gain = 0
 
+-- Older mpv ytdl hooks open the URL before yt-dlp's available_at time.
+-- Wait after the built-in hook has resolved the stream and before mpv opens it.
+mp.add_hook('on_load', 11, function(hook)
+    local result = mp.get_property_native('user-data/mpv/ytdl/json-subprocess-result')
+    local data = result and result.stdout and utils.parse_json(result.stdout)
+    if type(data) ~= 'table' then return end
+    local available = tonumber(data.available_at) or 0
+    local formats = data.requested_formats or data.requested_downloads
+    if type(formats) == 'table' then
+        for _, format in ipairs(formats) do
+            if type(format) == 'table' then
+                available = math.max(available, tonumber(format.available_at) or 0)
+            end
+        end
+    end
+    local delay = math.min(60, math.max(0, available - os.time()))
+    if delay > 0 then
+        hook:defer()
+        mp.add_timeout(delay, function() hook:cont() end)
+    end
+end)
+
 local function set_state(state, target)
     mp.set_property_native('user-data/focus-music-normalization', {state = state, gain_db = target or gain})
 end
